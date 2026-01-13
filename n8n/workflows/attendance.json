@@ -1,0 +1,160 @@
+{
+  "name": "SmartAttend - Attendance Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "attendance",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "attendance-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.event }}",
+              "operation": "equals",
+              "value2": "attendance.created"
+            }
+          ]
+        }
+      },
+      "id": "if-node",
+      "name": "Check Event Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "attendanceId",
+              "name": "attendanceId",
+              "value": "={{ $json.body.data.attendanceId }}",
+              "type": "string"
+            },
+            {
+              "id": "userId",
+              "name": "userId",
+              "value": "={{ $json.body.data.userId }}",
+              "type": "string"
+            },
+            {
+              "id": "studentId",
+              "name": "studentId",
+              "value": "={{ $json.body.data.studentId || 'N/A' }}",
+              "type": "string"
+            },
+            {
+              "id": "type",
+              "name": "type",
+              "value": "={{ $json.body.data.type }}",
+              "type": "string"
+            },
+            {
+              "id": "timestamp",
+              "name": "timestamp",
+              "value": "={{ $json.body.data.timestamp }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-node",
+      "name": "Extract Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "subject": "Бүртгэл хийгдлээ - SmartAttend",
+        "text": "=Бүртгэлийн мэдээлэл:\n\nОюутны ID: {{ $json.studentId }}\nТөрөл: {{ $json.type }}\nОгноо: {{ $json.timestamp }}\n\nЭнэ нь автоматаар илгээгдсэн мэйл юм.",
+        "options": {}
+      },
+      "id": "email-node",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "notes": "Email илгээх (SMTP тохируулга шаардлагатай)"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Attendance processed\" } }}"
+      },
+      "id": "respond-node",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check Event Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Event Type": {
+      "main": [
+        [
+          {
+            "node": "Extract Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-13T00:00:00.000Z",
+  "versionId": "1"
+}

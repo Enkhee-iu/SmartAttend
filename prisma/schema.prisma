@@ -1,0 +1,107 @@
+// Prisma Schema for SmartAttend System
+// Database: PostgreSQL (can be changed to MySQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// User model - Бүх хэрэглэгчид (оюутан, багш, админ)
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  role          UserRole  @default(STUDENT)
+  faceId        String?   @unique // AI face recognition ID
+  voiceId       String?   @unique // AI voice recognition ID
+  mfaEnabled    Boolean   @default(false)
+  mfaSecret     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  attendances   Attendance[]
+  sessions      Session[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  STUDENT   // Оюутан
+  TEACHER   // Багш
+  ADMIN     // Админ
+}
+
+// Session model - Authentication sessions
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  type         SessionType
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("sessions")
+}
+
+enum SessionType {
+  FACE        // Face recognition login
+  VOICE       // Voice recognition login
+  MFA         // MFA authenticated
+  PASSWORDLESS // Passwordless auth
+}
+
+// Student model - Оюутнууд (User-тэй холбоотой мэдээлэл)
+model Student {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  studentId     String   @unique // Оюутны код (registration number)
+  course        String?  // Хичээлийн нэр
+  year          Int?     // Курс
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("students")
+}
+
+// Attendance model - Бүртгэлийн түүх
+model Attendance {
+  id            String        @id @default(cuid())
+  userId        String
+  studentId     String?       // Оюутны код
+  type          AttendanceType @default(PRESENT)
+  recognizedBy  RecognitionType // Face/Voice recognition
+  location      String?       // Байршил (optional)
+  timestamp     DateTime      @default(now())
+  notes         String?       // Тэмдэглэл
+  metadata      Json?         // Нэмэлт мэдээлэл (AI confidence score, гэх мэт)
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([timestamp])
+  @@index([studentId])
+  @@map("attendances")
+}
+
+enum AttendanceType {
+  PRESENT      // Ирсэн
+  ABSENT       // Ирээгүй
+  LATE         // Хоцорсон
+  EXCUSED      // Зөвшөөрөгдсөн
+}
+
+enum RecognitionType {
+  FACE         // Нүүр таних
+  VOICE        // Дуу таних
+  MANUAL       // Гараар
+}
