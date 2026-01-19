@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaceCamera } from '@/components/FaceCamera';
+import { Chatbot } from '@/components/Chatbot';
 
 interface Attendance {
   id: string;
@@ -83,11 +84,16 @@ export default function DashboardPage() {
     const token = localStorage.getItem('auth_token');
 
     try {
-      // First recognize the face
+      // Face recognition + автомат бүртгэл
       const recognizeResponse = await fetch('/api/ai/face', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageData }),
+        body: JSON.stringify({
+          image: imageData,
+          autoRegister: true, // Автомат бүртгэл идэвхжүүлэх
+          location: 'Dashboard',
+          // course: 'Хичээлийн нэр', // Хэрэв хэрэгтэй бол
+        }),
       });
 
       const recognizeData = await recognizeResponse.json();
@@ -98,28 +104,22 @@ export default function DashboardPage() {
         return;
       }
 
-      // Record attendance
-      const attendanceResponse = await fetch('/api/attendance', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          recognizedBy: 'FACE',
-          type: 'PRESENT',
-          location: 'Dashboard',
-        }),
-      });
+      // Давхардсан бүртгэл шалгах
+      if (recognizeData.isDuplicate) {
+        alert('Та энэ өдөр/цагт аль хэдийн бүртгэгдсэн байна. Давхардсан бүртгэл.');
+        setShowCamera(false);
+        loadAttendances();
+        return;
+      }
 
-      const attendanceData = await attendanceResponse.json();
-
-      if (attendanceData.success) {
+      // Автомат бүртгэл амжилттай
+      if (recognizeData.attendance) {
         alert('Бүртгэл амжилттай хийгдлээ!');
         setShowCamera(false);
         loadAttendances();
       } else {
-        alert('Бүртгэл хийхэд алдаа гарлаа: ' + (attendanceData.error || 'Unknown error'));
+        // Хэрэв attendance үүсгэгдээгүй бол (алдаа гарсан)
+        alert('Бүртгэл үүсгэхэд алдаа гарлаа. Дахин оролдоно уу.');
       }
     } catch (error) {
       console.error('Attendance recording error:', error);
@@ -291,6 +291,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+      
+      {/* Chatbot */}
+      <Chatbot />
     </div>
   );
 }

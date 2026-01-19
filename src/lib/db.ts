@@ -123,6 +123,48 @@ export async function getAttendanceByDateRange(startDate: Date, endDate: Date) {
   });
 }
 
+// Check for duplicate attendance - нэг оюутан нэг өдөр/цаг дээр олон удаа бүртгэхээс сэргийлэх
+export async function checkDuplicateAttendance(
+  userId: string,
+  course?: string,
+  timeWindowMinutes: number = 60 // Default: 1 цагийн дотор давхардал шалгах
+) {
+  const now = new Date();
+  const timeWindowStart = new Date(now.getTime() - timeWindowMinutes * 60 * 1000);
+
+  // Бүх attendance-ийг авч, дараа нь filter хийх (JSON field query нь нарийн байдаг)
+  const recentAttendances = await prisma.attendance.findMany({
+    where: {
+      userId,
+      timestamp: {
+        gte: timeWindowStart,
+        lte: now,
+      },
+      type: 'PRESENT', // Зөвхөн "Ирсэн" бүртгэлүүдийг шалгах
+    },
+    orderBy: { timestamp: 'desc' },
+  });
+
+  // Хэрэв course байвал metadata-д шалгах
+  let existingAttendance = null;
+  if (course) {
+    existingAttendance = recentAttendances.find((att) => {
+      if (att.metadata && typeof att.metadata === 'object' && 'course' in att.metadata) {
+        return att.metadata.course === course;
+      }
+      return false;
+    });
+  } else {
+    // Course байхгүй бол эхний attendance-ийг авна
+    existingAttendance = recentAttendances[0] || null;
+  }
+
+  return {
+    isDuplicate: !!existingAttendance,
+    existingAttendance,
+  };
+}
+
 // Session operations
 export async function createSession(data: {
   userId: string;

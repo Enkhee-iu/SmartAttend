@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { FaceCamera } from '@/components/FaceCamera';
 
 export default function LoginPage() {
@@ -113,6 +114,29 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
+        {/* Back to Home Button */}
+        <div className="text-left">
+          <Link
+            href="/"
+            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <svg
+              className="w-4 h-4 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+            Нүүр хуудас руу буцах
+          </Link>
+        </div>
+
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Нэвтрэх
@@ -161,9 +185,17 @@ export default function LoginPage() {
 
         {method === 'face' && (
           <div className="mt-8">
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800 text-center">
+                Нүүрний зургаа аваад таниулна уу. Танигдсаны дараа шууд нэвтрэнэ.
+              </p>
+            </div>
             <FaceCamera onCapture={handleFaceCapture} onError={setError} />
             {loading && (
-              <p className="mt-4 text-center text-gray-600">Таних үед...</p>
+              <div className="mt-4 text-center">
+                <p className="text-blue-600 font-medium">Таних үед...</p>
+                <p className="text-sm text-gray-500 mt-1">Татаж байна...</p>
+              </div>
             )}
           </div>
         )}

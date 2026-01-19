@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAttendance, getAttendanceByUserId, getAttendanceByDateRange } from '@/lib/db';
+import { createAttendance, getAttendanceByUserId, getAttendanceByDateRange, checkDuplicateAttendance } from '@/lib/db';
 import { verifySession } from '@/lib/auth';
 
 // POST /api/attendance - Record attendance
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { studentId, type, recognizedBy, location, notes, metadata } = body;
+    const { studentId, type, recognizedBy, location, notes, metadata, course, skipDuplicateCheck } = body;
 
     // Validate required fields
     if (!recognizedBy || !['FACE', 'VOICE', 'MANUAL'].includes(recognizedBy)) {
@@ -33,6 +33,32 @@ export async function POST(request: NextRequest) {
         { error: 'Valid recognition type is required (FACE, VOICE, or MANUAL)' },
         { status: 400 }
       );
+    }
+
+    // Давхардал шалгах (хэрэв skipDuplicateCheck байхгүй бол)
+    if (!skipDuplicateCheck && (type === 'PRESENT' || !type)) {
+      const duplicateCheck = await checkDuplicateAttendance(
+        session.userId,
+        course || (metadata && typeof metadata === 'object' && 'course' in metadata ? metadata.course : undefined),
+        60 // 1 цагийн дотор давхардал шалгах
+      );
+
+      if (duplicateCheck.isDuplicate && duplicateCheck.existingAttendance) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Давхардсан бүртгэл',
+            message: 'Та энэ өдөр/цагт аль хэдийн бүртгэгдсэн байна.',
+            existingAttendance: {
+              id: duplicateCheck.existingAttendance.id,
+              timestamp: duplicateCheck.existingAttendance.timestamp,
+              location: duplicateCheck.existingAttendance.location,
+            },
+            isDuplicate: true,
+          },
+          { status: 409 } // Conflict status
+        );
+      }
     }
 
     // Create attendance record
@@ -43,7 +69,10 @@ export async function POST(request: NextRequest) {
       recognizedBy: recognizedBy as 'FACE' | 'VOICE' | 'MANUAL',
       location: location || undefined,
       notes: notes || undefined,
-      metadata: metadata || {},
+      metadata: {
+        ...(metadata || {}),
+        ...(course ? { course } : {}),
+      },
     });
 
     // Trigger N8N webhook (async, don't wait for response)

@@ -14,6 +14,17 @@ export interface FaceEmbedding {
   faceId: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface ChatResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
 interface LuxandPersonResponse {
   status: 'success' | 'error';
   uuid?: string;
@@ -256,6 +267,121 @@ export async function extractFaceEmbedding(imageData: string | Buffer): Promise<
   // This would require a different service or Luxand's enterprise features
   console.warn('Face embedding extraction not available with Luxand Cloud API');
   return null;
+}
+
+/**
+ * Chat with AI chatbot using GROQ API
+ * @param message - User message
+ * @param conversationHistory - Previous conversation messages
+ * @returns Chat response
+ */
+export async function chatWithAI(
+  message: string,
+  conversationHistory: ChatMessage[] = []
+): Promise<ChatResponse> {
+  try {
+    const groqApiKey = process.env.GROQ_API_KEY;
+
+    if (!groqApiKey) {
+      console.warn('GROQ_API_KEY not configured, using mock chatbot');
+      return mockChatbot(message, conversationHistory);
+    }
+
+    // Prepare messages for GROQ API
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: 'You are SmartAttend AI assistant. You help users with attendance management, face recognition, and system questions. Be helpful and concise. Respond in Mongolian when appropriate.',
+      },
+      ...conversationHistory,
+      {
+        role: 'user',
+        content: message,
+      },
+    ];
+
+    // Call GROQ API (OpenAI-compatible endpoint)
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${groqApiKey}`,
+      },
+      body: JSON.stringify({
+        model: process.env.GROQ_MODEL || 'llama-3.1-70b-versatile', // Default to fast model
+        messages: messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        temperature: 0.7,
+        max_tokens: 500,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`GROQ API error: ${response.status} ${JSON.stringify(errorData)}`);
+    }
+
+    const data = (await response.json()) as {
+      choices: Array<{ message: { content: string } }>;
+    };
+
+    if (data.choices && data.choices.length > 0) {
+      return {
+        success: true,
+        message: data.choices[0].message.content,
+      };
+    }
+
+    throw new Error('No response from GROQ API');
+  } catch (error) {
+    console.error('Chatbot error:', error);
+    // Fallback to mock chatbot on error
+    return mockChatbot(message, conversationHistory);
+  }
+}
+
+/**
+ * Mock chatbot for development/testing
+ */
+function mockChatbot(message: string, conversationHistory: ChatMessage[]): ChatResponse {
+  const lowerMessage = message.toLowerCase();
+
+  // Simple keyword-based responses
+  if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('сайн')) {
+    return {
+      success: true,
+      message: 'Сайн байна уу! Би SmartAttend AI туслах юм. Танайд яаж туслах вэ?',
+    };
+  }
+
+  if (lowerMessage.includes('attendance') || lowerMessage.includes('бүртгэл')) {
+    return {
+      success: true,
+      message: 'Бүртгэл хийхдээ Dashboard дээр "Бүртгэл Хийх" товч дараад нүүрний зургаа авах хэрэгтэй. AI нүүр таньж бүртгэл хийх болно.',
+    };
+  }
+
+  if (lowerMessage.includes('face') || lowerMessage.includes('нүүр')) {
+    return {
+      success: true,
+      message: 'Нүүр таних технологи нь Luxand Cloud AI ашиглаж байна. Нүүрний зургаа камер ашиглан авч болно.',
+    };
+  }
+
+  if (lowerMessage.includes('help') || lowerMessage.includes('туслах') || lowerMessage.includes('тусламж')) {
+    return {
+      success: true,
+      message: 'Би танд туслах боломжтой:\n- Бүртгэл хийх заавар\n- Нүүр таних талаарх мэдээлэл\n- Системийн асуултууд\nЮу асуух вэ?',
+    };
+  }
+
+  // Default response
+  return {
+    success: true,
+    message: 'Уучлаарай, би одоогоор энэ асуултанд хариулж чадахгүй байна. Бүртгэл, нүүр таних, эсвэл системийн талаар асуух боломжтой.',
+  };
 }
 
 /**

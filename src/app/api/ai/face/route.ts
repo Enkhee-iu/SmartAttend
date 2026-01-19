@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { recognizeFace, registerFace } from '@/lib/ai';
-import { prisma, findUserByFaceId } from '@/lib/db';
+import { prisma, findUserByFaceId, createAttendance, checkDuplicateAttendance } from '@/lib/db';
 
 // POST /api/ai/face - Recognize face or register face
 export async function POST(request: NextRequest) {
@@ -57,6 +57,45 @@ export async function POST(request: NextRequest) {
       const user = await findUserByFaceId(recognitionResult.faceId);
 
       if (user) {
+        // Автомат бүртгэл: Хэрэв autoRegister байвал attendance үүсгэх
+        const { autoRegister, course, location } = body;
+        let attendance = null;
+        let isDuplicate = false;
+
+        if (autoRegister === true) {
+          // Давхардал шалгах
+          const duplicateCheck = await checkDuplicateAttendance(
+            user.id,
+            course,
+            60 // 1 цагийн дотор давхардал шалгах
+          );
+
+          if (duplicateCheck.isDuplicate) {
+            isDuplicate = true;
+            attendance = duplicateCheck.existingAttendance;
+          } else {
+            // Attendance үүсгэх
+            try {
+              attendance = await createAttendance({
+                userId: user.id,
+                studentId: user.role === 'STUDENT' ? user.id : undefined,
+                type: 'PRESENT',
+                recognizedBy: 'FACE',
+                location: location || 'Face Recognition',
+                metadata: {
+                  course: course || null,
+                  confidence: recognitionResult.confidence,
+                  faceId: recognitionResult.faceId,
+                  autoRegistered: true,
+                },
+              });
+            } catch (error) {
+              console.error('Auto attendance creation error:', error);
+              // Attendance үүсгэхэд алдаа гарвал user мэдээллийг буцаах
+            }
+          }
+        }
+
         return NextResponse.json({
           success: true,
           userId: user.id,
@@ -68,6 +107,14 @@ export async function POST(request: NextRequest) {
           },
           confidence: recognitionResult.confidence,
           faceId: recognitionResult.faceId,
+          attendance: attendance
+            ? {
+                id: attendance.id,
+                timestamp: attendance.timestamp,
+                isDuplicate,
+              }
+            : null,
+          isDuplicate,
         });
       }
     }
