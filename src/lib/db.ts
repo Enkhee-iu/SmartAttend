@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 // PrismaClient instance - singleton pattern
 const globalForPrisma = globalThis as unknown as {
@@ -59,7 +59,7 @@ export async function createAttendance(data: {
   recognizedBy: 'FACE' | 'VOICE' | 'MANUAL';
   location?: string;
   notes?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.InputJsonValue;
 }) {
   return prisma.attendance.create({
     data: {
@@ -69,7 +69,7 @@ export async function createAttendance(data: {
       recognizedBy: data.recognizedBy,
       location: data.location,
       notes: data.notes,
-      metadata: data.metadata || {},
+      metadata: data.metadata,
     },
     include: {
       user: {

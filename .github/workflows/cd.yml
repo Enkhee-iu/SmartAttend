@@ -22,6 +22,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma Client
+        run: npm run db:generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://user:password@localhost:5432/db?schema=public' }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL || 'postgresql://user:password@localhost:5432/db?schema=public' }}
+
       - name: Run ESLint
         run: npm run lint
 
@@ -29,8 +35,12 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://user:password@localhost:5432/db?schema=public' }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL || 'postgresql://user:password@localhost:5432/db?schema=public' }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000' }}
 
       - name: Deploy to Vercel Production
+        if: ${{ secrets.VERCEL_TOKEN != '' && secrets.VERCEL_ORG_ID != '' && secrets.VERCEL_PROJECT_ID != '' }}
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}

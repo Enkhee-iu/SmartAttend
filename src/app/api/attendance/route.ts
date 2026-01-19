@@ -74,7 +74,6 @@ export async function POST(request: NextRequest) {
         recognizedBy: attendance.recognizedBy,
         location: attendance.location,
         timestamp: attendance.timestamp,
-        user: attendance.user,
       },
     });
   } catch (error) {
