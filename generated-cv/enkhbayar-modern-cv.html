@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Byambadorj Enkhbayar - Modern CV</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+
+    :root {
+      --ink: #172033;
+      --muted: #5f6b7a;
+      --line: #d8e0ea;
+      --soft: #f4f7fb;
+      --accent: #1d5fae;
+      --accent-dark: #123e73;
+      --accent-soft: #e8f1fb;
+      --chip: #edf3fa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #ffffff;
+      color: var(--ink);
+      font-family: "Droid Sans Fallback", "WenQuanYi Micro Hei", "Noto Sans", Arial, sans-serif;
+      font-size: 9.7pt;
+      line-height: 1.52;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      background: #fff;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr 33mm 62mm;
+      align-items: center;
+      gap: 6mm;
+      padding: 11mm 12mm 9mm;
+      color: #ffffff;
+      background: linear-gradient(135deg, var(--accent-dark), var(--accent));
+      border-radius: 0 0 9mm 9mm;
+    }
+
+    .hero h1 {
+      margin: 0 0 1.5mm;
+      font-size: 24pt;
+      line-height: 1.1;
+      letter-spacing: 0.02em;
+    }
+
+    .hero .kana {
+      margin: 0 0 4mm;
+      font-size: 10pt;
+      opacity: 0.9;
+    }
+
+    .hero .headline {
+      margin: 0;
+      max-width: 116mm;
+      font-size: 11.2pt;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .photo-wrap {
+      width: 32mm;
+      height: 32mm;
+      padding: 1.2mm;
+      background: rgba(255, 255, 255, 0.22);
+      border: 1px solid rgba(255, 255, 255, 0.46);
+      border-radius: 50%;
+      box-shadow: 0 5mm 12mm rgba(0, 0, 0, 0.18);
+    }
+
+    .profile-photo {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    .contact-card {
+      align-self: start;
+      padding: 5mm;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 5mm;
+    }
+
+    .contact-row {
+      margin: 0 0 2.2mm;
+      font-size: 8.5pt;
+      word-break: break-word;
+    }
+
+    .contact-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .contact-label {
+      display: block;
+      margin-bottom: 0.3mm;
+      color: #cfe3ff;
+      font-size: 7.2pt;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: 60mm 1fr;
+      gap: 8mm;
+      padding: 8mm 12mm 12mm;
+    }
+
+    section {
+      break-inside: avoid;
+      margin-bottom: 5.5mm;
+    }
+
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 2.6mm;
+      margin: 0 0 3mm;
+      color: var(--accent-dark);
+      font-size: 11.3pt;
+      line-height: 1.25;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h2::before {
+      content: "";
+      width: 3mm;
+      height: 3mm;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 0 1.5mm var(--accent-soft);
+    }
+
+    h3 {
+      margin: 0 0 0.8mm;
+      color: var(--ink);
+      font-size: 10pt;
+      line-height: 1.35;
+    }
+
+    p {
+      margin: 0 0 2.4mm;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 4.5mm;
+    }
+
+    li {
+      margin-bottom: 1.2mm;
+    }
+
+    .card {
+      padding: 4.2mm;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 4mm;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .profile {
+      font-size: 9.9pt;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 2.2mm;
+    }
+
+    .meta-item {
+      padding-bottom: 2.2mm;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .meta-item:last-child {
+      padding-bottom: 0;
+      border-bottom: 0;
+    }
+
+    .meta-label {
+      display: block;
+      color: var(--muted);
+      font-size: 7.4pt;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .meta-value {
+      display: block;
+      margin-top: 0.4mm;
+      font-weight: 700;
+    }
+
+    .timeline {
+      position: relative;
+      margin-left: 1.2mm;
+      padding-left: 5mm;
+      border-left: 1.5px solid var(--line);
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 3.2mm;
+      break-inside: avoid;
+    }
+
+    .timeline-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      top: 1.8mm;
+      left: -6.1mm;
+      width: 2.3mm;
+      height: 2.3mm;
+      background: var(--accent);
+      border: 1.2mm solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+
+    .date {
+      display: inline-block;
+      margin-bottom: 0.4mm;
+      color: var(--accent);
+      font-size: 8pt;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+    }
+
+    .company {
+      font-weight: 800;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.6mm;
+    }
+
+    .chip {
+      display: inline-block;
+      padding: 1.2mm 2.3mm;
+      color: var(--accent-dark);
+      background: var(--chip);
+      border: 1px solid #d9e7f5;
+      border-radius: 999px;
+      font-size: 8.4pt;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .skill-group {
+      margin-bottom: 3.2mm;
+    }
+
+    .skill-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .language-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 3mm;
+      padding: 1.8mm 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .language-row:last-child {
+      border-bottom: 0;
+    }
+
+    .level {
+      color: var(--accent-dark);
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .compact-list li {
+      margin-bottom: 0.8mm;
+    }
+
+    .footer {
+      margin: 0 12mm 8mm;
+      padding-top: 3mm;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: 7.4pt;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <h1>Byambadorj Enkhbayar</h1>
+        <p class="kana">ビャンバドルジ エンヘバヤル</p>
+        <p class="headline">System / Security Engineer &amp; Web Application Developer</p>
+      </div>
+      <div class="photo-wrap">
+        <img class="profile-photo" src="profile-cv-photo.png" alt="Byambadorj Enkhbayar profile photo" />
+      </div>
+      <div class="contact-card">
+        <p class="contact-row">
+          <span class="contact-label">Email</span>
+          mr.enkhbayar@gmail.com
+        </p>
+        <p class="contact-row">
+          <span class="contact-label">Phone</span>
+          +81-80-3680-0988
+        </p>
+        <p class="contact-row">
+          <span class="contact-label">Address</span>
+          〒331-0822 日本埼玉県川越市天沼新田 260-4 サンパティーク三 201号室
+        </p>
+      </div>
+    </header>
+
+    <div class="content">
+      <aside>
+        <section class="card">
+          <h2>Personal</h2>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <span class="meta-label">生年月日</span>
+              <span class="meta-value">1987年11月03日（38歳）</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">国籍</span>
+              <span class="meta-value">モンゴル</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">性別 / 配偶者</span>
+              <span class="meta-value">男性 / 既婚</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">在留資格</span>
+              <span class="meta-value">技術・人文知識・国際業務</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Languages</h2>
+          <div class="language-row">
+            <span>日本語</span>
+            <span class="level">上級 / JLPT N2</span>
+          </div>
+          <div class="language-row">
+            <span>英語</span>
+            <span class="level">中級</span>
+          </div>
+          <div class="language-row">
+            <span>モンゴル語</span>
+            <span class="level">ネイティブ</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Skills</h2>
+          <div class="skill-group">
+            <h3>Programming</h3>
+            <div class="chips">
+              <span class="chip">Java / Spring Boot</span>
+              <span class="chip">JavaScript</span>
+              <span class="chip">Python</span>
+              <span class="chip">VB / VBA</span>
+              <span class="chip">CSS3 / Sass</span>
+              <span class="chip">ChainReflectionScript</span>
+            </div>
+          </div>
+          <div class="skill-group">
+            <h3>Frameworks</h3>
+            <div class="chips">
+              <span class="chip">Express.js</span>
+              <span class="chip">Vue.js</span>
+              <span class="chip">GeneXus</span>
+              <span class="chip">BizBrowser</span>
+            </div>
+          </div>
+          <div class="skill-group">
+            <h3>Database / Cloud</h3>
+            <div class="chips">
+              <span class="chip">AWS</span>
+              <span class="chip">MSSQL</span>
+              <span class="chip">MySQL</span>
+              <span class="chip">PostgreSQL</span>
+            </div>
+          </div>
+          <div class="skill-group">
+            <h3>Network / Security</h3>
+            <div class="chips">
+              <span class="chip">FortiGate 900D</span>
+              <span class="chip">Fortinet Analyzer</span>
+              <span class="chip">Cisco ASA</span>
+              <span class="chip">Cisco Devices</span>
+            </div>
+          </div>
+          <div class="skill-group">
+            <h3>OS</h3>
+            <div class="chips">
+              <span class="chip">Linux</span>
+              <span class="chip">Windows</span>
+              <span class="chip">Windows Server</span>
+              <span class="chip">macOS</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Strengths</h2>
+          <ul class="compact-list">
+            <li>複雑な問題解決</li>
+            <li>創造性</li>
+            <li>チーム内外との調整</li>
+            <li>サービスオリエンテーション</li>
+            <li>折衝・コミュニケーション</li>
+          </ul>
+        </section>
+      </aside>
+
+      <article>
+        <section>
+          <h2>Profile</h2>
+          <p class="profile">
+            ネットワークインフラおよびコーディング領域でそれぞれ約4年の経験を持つエンジニアです。
+            次世代ファイアウォール（FORTINET）やCisco機器の構成・運用に加え、Express.js、Vue.js、
+            BizBrowser、GeneXusを活用したWebシステム開発で、バックエンド・フロントエンド双方を担当してきました。
+            AWSを用いたシステム開発・インフラ構築にも携わり、要件定義から設計、開発、テスト、運用保守まで一貫した経験があります。
+            将来的にはAIを活用したシステム開発に携わることを目指しています。
+          </p>
+        </section>
+
+        <section>
+          <h2>Work Experience</h2>
+          <div class="timeline">
+            <div class="timeline-item">
+              <span class="date">2025年03月 - 現在</span>
+              <div class="company">株式会社スタッフサービス</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2023年11月 - 2025年01月</span>
+              <div class="company">株式会社アマナ</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2022年11月 - 2023年11月</span>
+              <div class="company">FKC 株式会社</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2022年01月 - 2022年08月</span>
+              <div class="company">E-Mongolia Academy LLC</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2020年07月 - 2021年12月</span>
+              <div class="company">MCS International LLC - Oyu Tolgoi “3A” Project</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2018年10月 - 2020年02月</span>
+              <div class="company">Shangri-La, Ulaanbaatar LLC</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2012年12月 - 2018年10月</span>
+              <div class="company">Tavan Bogd LLC</div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Technical Experience</h2>
+          <div class="card">
+            <ul>
+              <li>AWS（EC2、S3、RDSなど）を活用し、クラウド環境でのシステム設計、構築、運用保守を経験。</li>
+              <li>Express.jsによるAPI開発、Vue.jsによるフロントエンド構築、BizBrowser・GeneXusを用いた業務システム開発を担当。</li>
+              <li>FORTINET次世代ファイアウォールのセキュリティポリシー設計・カスタマイズを通じ、組織のセキュリティ強化に貢献。</li>
+              <li>異なるバックグラウンドを持つメンバーと連携し、複雑なプロジェクトを円滑に推進。</li>
+            </ul>
+          </div>
+        </section>
+
+        <section>
+          <h2>Education</h2>
+          <div class="timeline">
+            <div class="timeline-item">
+              <span class="date">2018年05月</span>
+              <div class="company">モンゴル・ウランバートル 行政アカデミー</div>
+              <div class="muted">国家行政運営課程 修了</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2005年09月 - 2010年06月</span>
+              <div class="company">モンゴル科学技術大学</div>
+              <div class="muted">コンピューターエンジニア 学士（卒業論文提出により卒業）</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2009年04月 - 2011年02月</span>
+              <div class="company">LIC 国際学院（東京都）</div>
+              <div class="muted">日本語課程 卒業</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2007年06月 - 2009年02月</span>
+              <div class="company">文化教育大学（モンゴル）</div>
+              <div class="muted">中退</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2003年09月 - 2005年06月</span>
+              <div class="company">ウランバートル第24高等学校</div>
+              <div class="muted">卒業</div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Certifications / Training</h2>
+          <div class="timeline">
+            <div class="timeline-item">
+              <span class="date">2024年08月</span>
+              <div class="company">Ruby on Rails Online Course</div>
+              <div class="muted">40時間</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2022年07月</span>
+              <div class="company">AWS Online Course</div>
+              <div class="muted">3か月</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2021年04月</span>
+              <div class="company">Complete Ethical Hacking Certification Course</div>
+              <div class="muted">6か月間</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2021年04月</span>
+              <div class="company">PMP Exam Preparation Training Course</div>
+              <div class="muted">35時間</div>
+            </div>
+            <div class="timeline-item">
+              <span class="date">2018年09月</span>
+              <div class="company">Intermediate Knowledge of English</div>
+              <div class="muted">96時間</div>
+            </div>
+          </div>
+        </section>
+      </article>
+    </div>
+
+    <div class="footer">Updated: 2026/05/29</div>
+  </main>
+</body>
+</html>
