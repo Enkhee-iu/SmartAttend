@@ -2,59 +2,67 @@
 
 [hcnet.co.jp](https://www.hcnet.co.jp/) сайтын өнгө, дизайныг суурилсан PowerPoint загвар.
 
-## Файл
+## Файлууд
 
 | Файл | Тайлбар |
 |------|---------|
-| `HCNET_PowerPoint_Template.pptx` | Бэлэн PowerPoint загвар (9 слайд) |
+| `HCNET_PowerPoint_Template.pptx` | Бэлэн презентаци (16 слайд) |
+| `HCNET_PowerPoint_Template.potx` | **Office 365 template** — шинэ файл үүсгэхэд ашиглана |
+| `assets/hcnet_logo.jpg` | Албан ёсны HCNET лого |
+| `assets/hcnet_footer_logo.png` | Footer лого |
 
-## Өнгийн палитр (албан ёсны сайтаас)
+## Слайдын бүтэц (16)
 
-| Нэр | HEX | Хэрэглээ |
-|-----|-----|----------|
-| Primary Green | `#008C41` | Гарчиг, товч, гол элемент |
-| Accent Green | `#00C05B` | Тод акцент, зураас |
-| Dark Green | `#24593D` | Footer, харанхуй хэсэг |
-| Light BG | `#E5F9EE` | Зөөлөн дэвсгэр |
-| Text | `#333333` | Үндсэн текст |
-| Background | `#F8F8F8` | Слайдын дэвсгэр |
+| № | Төрөл | Зориулалт |
+|---|--------|-----------|
+| 1 | Title | Үндсэн гарчиг (лого орсон) |
+| 2 | Section | Хэсгийн заагч |
+| 3 | Agenda | Агуулгын жагсаалт |
+| 4 | Content | Bullet points |
+| 5 | Two Column | 2 багана |
+| 6 | Three Column | 3 багана |
+| 7 | Image + Text | Зураг + текст |
+| 8 | Process | Алхам алхмаар процесс |
+| 9 | KPI | Тоо, статистик |
+| 10 | Comparison | Before / After |
+| 11 | Team | Баг / профайл |
+| 12 | Table | Хүснэгт |
+| 13 | Quote | Ишлэл / highlight |
+| 14 | Contact | Холбоо барих / Q&A |
+| 15 | Thank You | Төгсгөл (лого орсон) |
+| 16 | Guide | Загварын заавар |
 
-## Слайдын бүтэц
+## Өнгийн палитр
 
-1. **Тitle** — Үндсэн гарчиг (表紙)
-2. **Section** — Хэсгийн заагч
-3. **Content** — Жагсаалт / bullet points
-4. **Two Column** — 2 багана
-5. **Image + Text** — Зураг + текст
-6. **Table** — Хүснэгт
-7. **Quote** — Ишлэл / highlight
-8. **Thank You** — Төгсгөл
-9. **Guide** — Загварын заавар + өнгийн палитр
+| Өнгө | HEX |
+|------|-----|
+| Primary Green | `#008C41` |
+| Accent Green | `#00C05B` |
+| Dark Green | `#24593D` |
+| Light BG | `#E5F9EE` |
+| Text | `#333333` |
+| Background | `#F8F8F8` |
 
 ## MS Office 365-д хэрхэн ашиглах
 
-### 1. Файлыг нээх
+### .potx template ашиглах (зөвлөмж)
 
-1. `HCNET_PowerPoint_Template.pptx` файлыг татаж авна
-2. PowerPoint (Office 365) дээр нээнэ
+1. `HCNET_PowerPoint_Template.potx` файлыг татаж авна
+2. Файл дээр **давхар дарж** PowerPoint-оор нээнэ
+3. Office 365 автоматаар **шинэ презентаци** үүсгэнэ
+4. Хэрэгтэй слайдыг хуулж, текстийг солино
 
-### 2. Шинэ презентаци үүсгэх
+### .pptx ашиглах
 
-1. Хэрэгтэй слайдыг **хуулна** (Ctrl+C → Ctrl+V)
-2. Текстийг өөрийн агуулгаар солино
+1. `HCNET_PowerPoint_Template.pptx` нээнэ
+2. Хэрэгтэй слайдыг хуулна (Ctrl+C → Ctrl+V)
 3. Хэрэггүй слайдыг устгана
 
-### 3. Загвар болгон хадгалах (сонголт)
+### OneDrive / SharePoint
 
-1. **Файл** → **另存为 / Save As**
-2. Файлын төрөл: **PowerPoint Template (*.potx)**
-3. Дараагийн удаа `.potx`-оос шинэ файл үүсгэнэ
+Office 365 ашиглаж байгаа бол `.potx` файлыг OneDrive дээр хадгалаад багийнхантай хуваалцана.
 
-### 4. OneDrive / SharePoint
-
-Office 365 ашиглаж байгаа бол OneDrive дээр хадгалаад багийнхантай хуваалцана.
-
-## Дахин үүсгэх (хөгжүүлэгчид)
+## Дахин үүсгэх
 
 ```bash
 pip install python-pptx
@@ -63,6 +71,5 @@ python scripts/generate_hcnet_ppt_template.py
 
 ## Анхаарах зүйл
 
-- Энэ загвар нь HCNET сайтын **өнгө, загвар**-д суурилсан **загварчилсан** template юм.
-- Албан ёсны HCNET лого нь оруулаагүй — шаардлагатай бол [hcnet.co.jp](https://www.hcnet.co.jp/)-ийн албан ёсны лого ашиглана уу.
-- Фont: **Yu Gothic** (Windows), **Noto Sans JP** (Mac) — япон текстэд тохиромжтой.
+- Лого нь [hcnet.co.jp](https://www.hcnet.co.jp/) албан ёсны сайтаас авсан
+- Font: **Yu Gothic** (Windows), **Noto Sans JP** (Mac)
