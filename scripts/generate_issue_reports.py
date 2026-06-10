@@ -3,6 +3,8 @@ r"""Generate monthly Hitachi City issue reports from an issues.csv export.
 
 Usage examples:
 
+  python scripts/generate_issue_reports.py
+
   python scripts/generate_issue_reports.py issues.csv
 
   python scripts/generate_issue_reports.py ^
@@ -75,8 +77,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "issues_csv",
         nargs="?",
-        default="issues.csv",
-        help="Path to issues.csv. Default: ./issues.csv",
+        default=None,
+        help="Path to issues.csv. If omitted, a file picker is opened.",
     )
     parser.add_argument(
         "--output-dir",
@@ -92,6 +94,11 @@ def parse_args() -> argparse.Namespace:
         "--maintenance-output",
         default=None,
         help=f"Full output path for {MAINTENANCE_REPORT_NAME}. Overrides --output-dir for this file.",
+    )
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Open a file picker for issues.csv and save reports next to the selected file.",
     )
     return parser.parse_args()
 
@@ -228,27 +235,108 @@ def output_paths(args: argparse.Namespace, issues_csv: Path) -> tuple[Path, Path
     return helpdesk_output, maintenance_output
 
 
-def main() -> int:
-    args = parse_args()
-    issues_csv = Path(args.issues_csv)
+def generate_reports(
+    issues_csv: Path,
+    output_dir: Path | None = None,
+    helpdesk_output: Path | None = None,
+    maintenance_output: Path | None = None,
+) -> dict[str, object]:
     if not issues_csv.exists():
-        print(f"CSV file not found: {issues_csv}", file=sys.stderr)
-        return 1
+        raise FileNotFoundError(f"CSV file not found: {issues_csv}")
 
     source_header, source_rows, encoding = read_csv_rows(issues_csv)
     classified_rows = [(row, *classify_row(row)) for row in source_rows]
     helpdesk_rows = [row for row in classified_rows if row[1] == "help desk"]
     maintenance_rows = [row for row in classified_rows if row[1] == "maintenance"]
 
-    helpdesk_output, maintenance_output = output_paths(args, issues_csv)
-    write_workbook(helpdesk_output, HELP_DESK_SHEET_NAME, source_header, helpdesk_rows)
-    write_workbook(maintenance_output, MAINTENANCE_SHEET_NAME, source_header, maintenance_rows)
+    output_dir = output_dir if output_dir else issues_csv.parent
+    helpdesk_path = helpdesk_output if helpdesk_output else output_dir / HELP_DESK_REPORT_NAME
+    maintenance_path = (
+        maintenance_output
+        if maintenance_output
+        else output_dir / MAINTENANCE_REPORT_NAME
+    )
+    write_workbook(helpdesk_path, HELP_DESK_SHEET_NAME, source_header, helpdesk_rows)
+    write_workbook(maintenance_path, MAINTENANCE_SHEET_NAME, source_header, maintenance_rows)
 
-    print(f"Read CSV: {issues_csv}")
-    print(f"Detected encoding: {encoding}")
-    print(f"Total issues: {len(source_rows)}")
-    print(f"Help desk: {len(helpdesk_rows)} -> {helpdesk_output}")
-    print(f"Maintenance: {len(maintenance_rows)} -> {maintenance_output}")
+    return {
+        "issues_csv": issues_csv,
+        "encoding": encoding,
+        "total": len(source_rows),
+        "helpdesk_count": len(helpdesk_rows),
+        "maintenance_count": len(maintenance_rows),
+        "helpdesk_output": helpdesk_path,
+        "maintenance_output": maintenance_path,
+    }
+
+
+def run_gui() -> int:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog, messagebox
+    except Exception as exc:
+        print(f"GUI could not be started: {exc}", file=sys.stderr)
+        return 1
+
+    root = tk.Tk()
+    root.withdraw()
+    root.update()
+
+    issues_file = filedialog.askopenfilename(
+        title="issues.csv を選択してください",
+        filetypes=(("CSV files", "*.csv"), ("All files", "*.*")),
+    )
+    if not issues_file:
+        return 0
+
+    try:
+        result = generate_reports(Path(issues_file))
+    except Exception as exc:
+        messagebox.showerror("Report generation failed", str(exc))
+        return 1
+
+    messagebox.showinfo(
+        "Report generation completed",
+        "\n".join(
+            [
+                "Excel files were created successfully.",
+                "",
+                f"Total issues: {result['total']}",
+                f"Help desk: {result['helpdesk_count']}",
+                f"Maintenance: {result['maintenance_count']}",
+                "",
+                f"1) {result['helpdesk_output']}",
+                f"2) {result['maintenance_output']}",
+            ]
+        ),
+    )
+    return 0
+
+
+def main() -> int:
+    args = parse_args()
+    if args.gui or args.issues_csv is None:
+        return run_gui()
+
+    issues_csv = Path(args.issues_csv)
+    helpdesk_output, maintenance_output = output_paths(args, issues_csv)
+
+    try:
+        result = generate_reports(
+            issues_csv,
+            output_dir=Path(args.output_dir) if args.output_dir else None,
+            helpdesk_output=helpdesk_output,
+            maintenance_output=maintenance_output,
+        )
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    print(f"Read CSV: {result['issues_csv']}")
+    print(f"Detected encoding: {result['encoding']}")
+    print(f"Total issues: {result['total']}")
+    print(f"Help desk: {result['helpdesk_count']} -> {result['helpdesk_output']}")
+    print(f"Maintenance: {result['maintenance_count']} -> {result['maintenance_output']}")
     return 0
 
 
