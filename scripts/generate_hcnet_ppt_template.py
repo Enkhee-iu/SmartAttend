@@ -493,6 +493,28 @@ def convert_pptx_to_potx(pptx_path: Path, potx_path: Path) -> None:
     temp_path.replace(potx_path)
 
 
+def create_zip_bundle(out_dir: Path) -> Path:
+    """Package all template files into a single zip."""
+    import zipfile
+
+    zip_path = out_dir / "HCNET_PowerPoint_Template.zip"
+    files = [
+        out_dir / "HCNET_PowerPoint_Template.pptx",
+        out_dir / "HCNET_PowerPoint_Template.potx",
+        out_dir / "README.md",
+        ASSETS / "hcnet_logo.jpg",
+        ASSETS / "hcnet_footer_logo.png",
+    ]
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in files:
+            if path.exists():
+                arcname = path.relative_to(out_dir)
+                if path.parent == ASSETS:
+                    arcname = Path("assets") / path.name
+                zf.write(path, arcname)
+    return zip_path
+
+
 def main() -> None:
     out_dir = ROOT / "docs" / "templates"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -504,9 +526,11 @@ def main() -> None:
     prs = build_template()
     prs.save(pptx_path)
     convert_pptx_to_potx(pptx_path, potx_path)
+    zip_path = create_zip_bundle(out_dir)
 
     print(f"Saved: {pptx_path} ({len(prs.slides)} slides)")
     print(f"Saved: {potx_path} (Office 365 template)")
+    print(f"Saved: {zip_path} (all files bundled)")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,22 @@
 
 [hcnet.co.jp](https://www.hcnet.co.jp/) сайтын өнгө, дизайныг суурилсан PowerPoint загвар.
 
+## ⬇️ Бүгдийг нь татаж авах (Download)
+
+| Файл | Холбоос |
+|------|---------|
+| **📦 ZIP (бүгд)** | [HCNET_PowerPoint_Template.zip](./HCNET_PowerPoint_Template.zip) |
+| `.potx` (Office 365 template) | [HCNET_PowerPoint_Template.potx](./HCNET_PowerPoint_Template.potx) |
+| `.pptx` (бэлэн презентаци) | [HCNET_PowerPoint_Template.pptx](./HCNET_PowerPoint_Template.pptx) |
+
+**GitHub-аас шууд татах:**
+
+- ZIP: `https://github.com/Enkhee-iu/SmartAttend/raw/main/docs/templates/HCNET_PowerPoint_Template.zip`
+- POTX: `https://github.com/Enkhee-iu/SmartAttend/raw/main/docs/templates/HCNET_PowerPoint_Template.potx`
+- PPTX: `https://github.com/Enkhee-iu/SmartAttend/raw/main/docs/templates/HCNET_PowerPoint_Template.pptx`
+
+> ZIP-д багтана: `.pptx`, `.potx`, лого (`assets/`), `README.md`
+
 ## Файлууд
 
 | Файл | Тайлбар |
@@ -73,3 +89,7 @@ python scripts/generate_hcnet_ppt_template.py
 
 - Лого нь [hcnet.co.jp](https://www.hcnet.co.jp/) албан ёсны сайтаас авсан
 - Font: **Yu Gothic** (Windows), **Noto Sans JP** (Mac)
+
+---
+
+**Татаж авах:** [📦 HCNET_PowerPoint_Template.zip](./HCNET_PowerPoint_Template.zip)
