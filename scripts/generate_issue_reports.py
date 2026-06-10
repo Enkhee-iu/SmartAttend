@@ -289,8 +289,16 @@ def run_gui() -> int:
     if not issues_file:
         return 0
 
+    desktop_dir = Path.home() / "Desktop"
+    initial_dir = desktop_dir if desktop_dir.exists() else Path(issues_file).parent
+    output_dir = filedialog.askdirectory(
+        title="Excelファイルの保存先フォルダを選択してください",
+        initialdir=str(initial_dir),
+    )
+    output_path = Path(output_dir) if output_dir else initial_dir
+
     try:
-        result = generate_reports(Path(issues_file))
+        result = generate_reports(Path(issues_file), output_dir=output_path)
     except Exception as exc:
         messagebox.showerror("Report generation failed", str(exc))
         return 1
