@@ -257,20 +257,30 @@ def apply_cell_style(cell, *, fill=None, font=None, border=None, alignment=None,
         cell.number_format = number_format
 
 
-def style_report_sheet(ws, widths: list[int], header_row: int = 1, start_col: int = 1, data_start_row: int | None = None) -> None:
+def style_report_sheet(
+    ws,
+    widths: list[int],
+    header_row: int = 1,
+    start_col: int = 1,
+    data_start_row: int | None = None,
+    left_aligned_columns: set[int] | None = None,
+    border_style: str = "thin",
+) -> None:
     data_start_row = data_start_row or header_row + 1
-    thin = Side(style="thin", color="000000")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    side = Side(style=border_style, color="000000")
+    border = Border(left=side, right=side, top=side, bottom=side)
     header_font = Font(name="ＭＳ Ｐゴシック", bold=True, size=10)
     body_font = Font(name="ＭＳ Ｐゴシック", size=10)
+    left_aligned_columns = left_aligned_columns or set()
     for row in ws.iter_rows(min_row=header_row, max_row=ws.max_row, min_col=start_col, max_col=start_col + len(widths) - 1):
         for cell in row:
             is_header = cell.row == header_row
+            horizontal = "center" if is_header or cell.column not in left_aligned_columns else "left"
             apply_cell_style(
                 cell,
                 font=header_font if is_header else body_font,
                 border=border,
-                alignment=Alignment(horizontal="center" if is_header else "left", vertical="center" if is_header else "top", wrap_text=True),
+                alignment=Alignment(horizontal=horizontal, vertical="center", wrap_text=True),
             )
             if isinstance(cell.value, datetime):
                 cell.number_format = "yyyy/m/d"
@@ -364,7 +374,12 @@ def write_helpdesk_workbook(path: Path, rows: list[dict[str, str]], year: int, m
     ws.append(HELP_DESK_HEADERS)
     for index, row in enumerate(rows, start=1):
         ws.append(helpdesk_row(row, index))
-    style_report_sheet(ws, [8, 12, 13, 13, 12, 24, 18, 50, 60])
+    style_report_sheet(
+        ws,
+        [8, 12, 13, 13, 12, 24, 18, 50, 60],
+        left_aligned_columns={8, 9},
+        border_style="medium",
+    )
     wb.save(path)
 
 
@@ -377,7 +392,12 @@ def write_maintenance_workbook(path: Path, all_rows: list[tuple[dict[str, str], 
     data.append(MAINTENANCE_HEADERS)
     for index, row in enumerate(maintenance_rows, start=1):
         data.append(maintenance_row(row, index))
-    style_report_sheet(data, [6, 12, 13, 13, 12, 22, 18, 16, 18, 18, 46, 46, 56])
+    style_report_sheet(
+        data,
+        [6, 12, 13, 13, 12, 22, 18, 16, 18, 18, 46, 46, 56],
+        left_aligned_columns={11, 12, 13},
+        border_style="medium",
+    )
     raw = wb.create_sheet("元データ２")
     for _ in range(1):
         raw.append([])
