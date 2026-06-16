@@ -65,6 +65,24 @@ MAINTENANCE_HEADERS = [
     "処置",
 ]
 
+# Ticket-specific help desk decisions confirmed by operations review.
+# These entries document why the row is treated as help desk even when the
+# title says 通常保守 or the text contains hardware-related words.
+HELP_DESK_TICKET_REASONS = {
+    "HB21561": "LAN cable claw break: connector re-termination handled as help desk cable work.",
+    "HB21588": "DNS record / Salesforce DKIM / IIJ / dig confirmation request.",
+    "HB21599": "LAN cable claw break: connector re-termination handled as help desk cable work.",
+    "HB21632": "LAN cable repair request / IEC on-site reception without vendor hardware replacement.",
+    "HB21646": "Mail delivery log investigation and guidance.",
+    "HB21699": "LAN cable claw break: connector re-termination handled as help desk cable work.",
+    "HB21753": "LAN connector claw break: connector re-termination handled as help desk cable work.",
+    "HB21776": "Touchpad/device-manager/admin-rights guidance.",
+    "HB21893": "LAN cable repair scheduling request, no device/vendor maintenance recorded.",
+    "HB21898": "Operations-confirmed help desk ticket.",
+    "HB21909": "ESET/admin-password investigation and manufacturer inquiry.",
+    "HB21914": "Office/iFilter/MS server authentication and communication permission inquiry.",
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -202,6 +220,8 @@ def combined_text(row: dict[str, str]) -> str:
 
 def is_helpdesk(row: dict[str, str]) -> bool:
     text = combined_text(row)
+    if ticket_number(value(row, "題名")) in HELP_DESK_TICKET_REASONS:
+        return True
     if any(keyword in text for keyword in ("Office", "office", "iFilter", "ifilter", "MSサーバ", "通信許可", "設定変更")):
         return True
     if "認証" in text and any(keyword in text for keyword in ("Office", "office", "iFilter", "ifilter", "MS", "サーバ")):
