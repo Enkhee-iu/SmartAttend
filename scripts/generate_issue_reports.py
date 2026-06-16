@@ -202,6 +202,12 @@ def combined_text(row: dict[str, str]) -> str:
 
 def is_helpdesk(row: dict[str, str]) -> bool:
     text = combined_text(row)
+    if any(keyword in text for keyword in ("Office", "office", "iFilter", "ifilter", "MSサーバ", "通信許可", "設定変更")):
+        return True
+    if "認証" in text and any(keyword in text for keyword in ("Office", "office", "iFilter", "ifilter", "MS", "サーバ")):
+        return True
+    if any(keyword in text for keyword in ("DNSレコード", "Salesforce", "DKIM", "domainkey", "IIJ", "digコマンド", "CNAME")):
+        return True
     if any(keyword in text for keyword in ("RDSサーバ", "サーバに接続できない", "CPU負荷", "セッション")):
         return True
     if any(keyword in text for keyword in ("ドラムユニット", "消耗品")):
