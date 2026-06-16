@@ -164,11 +164,14 @@ def parse_date(text: str):
     return text
 
 
-def sort_key(row: dict[str, str]) -> tuple[datetime, str]:
-    parsed = parse_date(value(row, "受付日"))
-    if not isinstance(parsed, datetime):
-        parsed = datetime.min
-    return parsed, ticket_number(value(row, "題名"))
+def sort_key(row: dict[str, str]) -> tuple[datetime, datetime, str]:
+    received_date = parse_date(value(row, "受付日"))
+    if not isinstance(received_date, datetime):
+        received_date = datetime.min
+    completed_date = parse_date(value(row, "作業完了日"))
+    if not isinstance(completed_date, datetime):
+        completed_date = datetime.min
+    return received_date, completed_date, ticket_number(value(row, "題名"))
 
 
 def ticket_number(title: str) -> str:
