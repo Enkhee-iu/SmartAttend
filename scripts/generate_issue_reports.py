@@ -164,6 +164,13 @@ def parse_date(text: str):
     return text
 
 
+def sort_key(row: dict[str, str]) -> tuple[datetime, str]:
+    parsed = parse_date(value(row, "受付日"))
+    if not isinstance(parsed, datetime):
+        parsed = datetime.min
+    return parsed, ticket_number(value(row, "題名"))
+
+
 def ticket_number(title: str) -> str:
     match = re.search(r"\[(HB\d+)\]", title or "")
     return match.group(1) if match else filled(title)
@@ -254,7 +261,6 @@ def style_report_sheet(ws, widths: list[int], header_row: int = 1, start_col: in
     data_start_row = data_start_row or header_row + 1
     thin = Side(style="thin", color="000000")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    header_fill = PatternFill("solid", fgColor="D9EAF7")
     header_font = Font(name="ＭＳ Ｐゴシック", bold=True, size=10)
     body_font = Font(name="ＭＳ Ｐゴシック", size=10)
     for row in ws.iter_rows(min_row=header_row, max_row=ws.max_row, min_col=start_col, max_col=start_col + len(widths) - 1):
@@ -262,7 +268,6 @@ def style_report_sheet(ws, widths: list[int], header_row: int = 1, start_col: in
             is_header = cell.row == header_row
             apply_cell_style(
                 cell,
-                fill=header_fill if is_header else None,
                 font=header_font if is_header else body_font,
                 border=border,
                 alignment=Alignment(horizontal="center" if is_header else "left", vertical="center" if is_header else "top", wrap_text=True),
@@ -272,7 +277,6 @@ def style_report_sheet(ws, widths: list[int], header_row: int = 1, start_col: in
     for offset, width in enumerate(widths):
         ws.column_dimensions[get_column_letter(start_col + offset)].width = width
     ws.freeze_panes = ws.cell(data_start_row, start_col).coordinate
-    ws.auto_filter.ref = f"{get_column_letter(start_col)}{header_row}:{get_column_letter(start_col + len(widths) - 1)}{ws.max_row}"
 
 
 def setup_summary_sheet(ws, title: str, period: str, count: int, remarks: str, is_maintenance: bool) -> None:
@@ -392,7 +396,7 @@ def generate_reports(issues_csv: Path, output_dir: Path | None = None) -> dict[s
     if not issues_csv.exists():
         raise FileNotFoundError(f"CSV file not found: {issues_csv}")
     source_header, source_rows, encoding = read_csv_rows(issues_csv)
-    rows = rows_as_dicts(source_header, source_rows)
+    rows = sorted(rows_as_dicts(source_header, source_rows), key=sort_key, reverse=True)
     classified = [(row, "helpdesk" if is_helpdesk(row) else "maintenance") for row in rows]
     helpdesk_rows = [row for row, classification in classified if classification == "helpdesk"]
     maintenance_rows = [row for row, classification in classified if classification == "maintenance"]
