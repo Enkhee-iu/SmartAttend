@@ -396,7 +396,7 @@ def generate_reports(issues_csv: Path, output_dir: Path | None = None) -> dict[s
     if not issues_csv.exists():
         raise FileNotFoundError(f"CSV file not found: {issues_csv}")
     source_header, source_rows, encoding = read_csv_rows(issues_csv)
-    rows = sorted(rows_as_dicts(source_header, source_rows), key=sort_key, reverse=True)
+    rows = sorted(rows_as_dicts(source_header, source_rows), key=sort_key)
     classified = [(row, "helpdesk" if is_helpdesk(row) else "maintenance") for row in rows]
     helpdesk_rows = [row for row, classification in classified if classification == "helpdesk"]
     maintenance_rows = [row for row, classification in classified if classification == "maintenance"]
