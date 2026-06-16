@@ -206,6 +206,12 @@ def is_helpdesk(row: dict[str, str]) -> bool:
         return True
     if "認証" in text and any(keyword in text for keyword in ("Office", "office", "iFilter", "ifilter", "MS", "サーバ")):
         return True
+    if any(keyword in text for keyword in ("ESET", "管理者パスワード", "メーカ問い合わせ", "情報収集")):
+        return True
+    if any(keyword in text for keyword in ("メール配送", "送信元", "送信先", "メールサーバ", "ログを調査", "ログ調査")):
+        return True
+    if any(keyword in text for keyword in ("タッチパッド", "デバイスマネージャー", "管理者権限")):
+        return True
     if any(keyword in text for keyword in ("DNSレコード", "Salesforce", "DKIM", "domainkey", "IIJ", "digコマンド", "CNAME")):
         return True
     if any(keyword in text for keyword in ("RDSサーバ", "サーバに接続できない", "CPU負荷", "セッション")):
