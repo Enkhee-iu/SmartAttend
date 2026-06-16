@@ -83,6 +83,32 @@ HELP_DESK_TICKET_REASONS = {
     "HB21914": "Office/iFilter/MS server authentication and communication permission inquiry.",
 }
 
+STRONG_MAINTENANCE_KEYWORDS = (
+    "マウスを交換",
+    "マウスの交換",
+    "マウス交換",
+    "交換機の設置",
+    "故障機の回収",
+    "ACアダプタ",
+    "アダプタの交換",
+    "ベースエンクロージャ",
+    "ベースエンクロージャー",
+    "トップカバー",
+    "キーボード",
+    "マザーボード",
+    "IOボード",
+    "定着ユニット",
+    "メーカー修理",
+    "HP修理",
+    "富士通",
+    "修理申込番号",
+    "修理受付番号",
+    "代替機",
+    "見積",
+    "カバーが取れ",
+    "破損部",
+)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -218,11 +244,76 @@ def combined_text(row: dict[str, str]) -> str:
     return "\n".join(value(row, key) for key in keys if value(row, key))
 
 
+def has_strong_maintenance(row: dict[str, str]) -> bool:
+    text = combined_text(row)
+    return any(keyword in text for keyword in STRONG_MAINTENANCE_KEYWORDS)
+
+
+def has_lan_cable_helpdesk_work(row: dict[str, str]) -> bool:
+    text = combined_text(row)
+    action_text = "\n".join(value(row, key) for key in ("処置", "連絡欄") if value(row, key))
+    if "LANケーブル爪折れ" in text or "LANケーブルの爪折れ" in text:
+        return True
+    if "コネクタ部" in text and "再成端" in text:
+        return True
+    return "LANケーブル" in action_text and any(keyword in action_text for keyword in ("修繕", "交換", "再成端"))
+
+
+def extract_lan_cable_work(row: dict[str, str]) -> str:
+    text = "\n".join(value(row, key) for key in ("症状", "原因", "処置", "連絡欄") if value(row, key))
+    parts = re.split(r"(?<=。)|\n|、", text)
+    matches = [
+        part.strip()
+        for part in parts
+        if (
+            ("LANケーブル" in part and any(keyword in part for keyword in ("爪折れ", "修繕", "交換", "再成端")))
+            or ("コネクタ部" in part and "再成端" in part)
+        )
+    ]
+    return "、".join(match for match in matches if match) or "LANケーブル修繕対応"
+
+
+def without_lan_cable_work(text: str) -> str:
+    parts = re.split(r"(?<=。)|\n", text or "")
+    kept = [
+        part.strip()
+        for part in parts
+        if not (
+            ("LANケーブル" in part and any(keyword in part for keyword in ("爪折れ", "修繕", "交換", "再成端")))
+            or ("コネクタ部" in part and "再成端" in part)
+        )
+    ]
+    return "\n".join(part for part in kept if part)
+
+
+def split_work_items(row: dict[str, str]) -> list[tuple[dict[str, str], str]]:
+    """Return one or more work items for a ticket.
+
+    A single ticket can contain both hardware maintenance and help desk cable
+    work. In that case the ticket is split into two output rows so both reports
+    receive the correct work item.
+    """
+    if has_strong_maintenance(row) and has_lan_cable_helpdesk_work(row):
+        maintenance = row.copy()
+        maintenance["処置"] = without_lan_cable_work(value(row, "処置")) or value(row, "処置")
+
+        helpdesk = row.copy()
+        lan_work = extract_lan_cable_work(row)
+        helpdesk["症状"] = lan_work
+        helpdesk["原因"] = "LANケーブル対応"
+        helpdesk["処置"] = lan_work
+        return [(maintenance, "maintenance"), (helpdesk, "helpdesk")]
+
+    return [(row, "helpdesk" if is_helpdesk(row) else "maintenance")]
+
+
 def is_helpdesk(row: dict[str, str]) -> bool:
     text = combined_text(row)
     if ticket_number(value(row, "題名")) in HELP_DESK_TICKET_REASONS:
         return True
-    if any(keyword in text for keyword in ("Office", "office", "iFilter", "ifilter", "MSサーバ", "通信許可", "設定変更")):
+    if has_strong_maintenance(row):
+        return False
+    if any(keyword in text for keyword in ("Office製品", "office製品", "iFilter", "ifilter", "MSサーバ", "通信許可", "設定変更")):
         return True
     if "認証" in text and any(keyword in text for keyword in ("Office", "office", "iFilter", "ifilter", "MS", "サーバ")):
         return True
@@ -452,7 +543,7 @@ def generate_reports(issues_csv: Path, output_dir: Path | None = None) -> dict[s
         raise FileNotFoundError(f"CSV file not found: {issues_csv}")
     source_header, source_rows, encoding = read_csv_rows(issues_csv)
     rows = sorted(rows_as_dicts(source_header, source_rows), key=sort_key)
-    classified = [(row, "helpdesk" if is_helpdesk(row) else "maintenance") for row in rows]
+    classified = [item for row in rows for item in split_work_items(row)]
     helpdesk_rows = [row for row, classification in classified if classification == "helpdesk"]
     maintenance_rows = [row for row, classification in classified if classification == "maintenance"]
     year, month, last_day = previous_month()
