@@ -1,28 +1,21 @@
 #!/usr/bin/env python3
-r"""Generate monthly Hitachi City issue reports from an issues.csv export.
+r"""Generate Hitachi City help desk and maintenance monthly reports.
 
-Usage examples:
-
-  python scripts/generate_issue_reports.py
-
-  python scripts/generate_issue_reports.py issues.csv
-
-  python scripts/generate_issue_reports.py ^
-    "z:\hh00330\OneDrive - APS-HCNETグループ\PassageDrive\Workspace\Downloads\issues.csv" ^
-    --output-dir "z:\hh00330\OneDrive - APS-HCNETグループ\PassageDrive\Workspace\Downloads"
-
-The script creates two Excel files:
-  1.日立市様ヘルプデスク2026年5月分ご報告.xlsx
-  2.日立市様各種賃貸借契約に対する保守対応定期報告書2026年5月分ご報告.xlsx
+Double-clicking the Windows EXE opens a file picker for issues.csv. The two
+Excel files are written to the same folder as the selected CSV file.
 """
 
 from __future__ import annotations
 
 import argparse
+import calendar
 import csv
 import io
+import re
 import sys
 import warnings
+from copy import copy
+from datetime import date, datetime
 from pathlib import Path
 
 warnings.filterwarnings(
@@ -42,81 +35,35 @@ except ModuleNotFoundError as exc:
     ) from exc
 
 
-HELP_DESK_REPORT_NAME = "1.日立市様ヘルプデスク2026年5月分ご報告.xlsx"
-MAINTENANCE_REPORT_NAME = "2.日立市様各種賃貸借契約に対する保守対応定期報告書2026年5月分ご報告.xlsx"
-
-HELP_DESK_SHEET_NAME = "日立市様ヘルプデスク2026年5月分ご報告"
-MAINTENANCE_SHEET_NAME = "日立市様各種賃貸借契約に対する保守対応定期報告書2026年5月分ご報告"
-
 ENCODINGS_TO_TRY = ("utf-8-sig", "cp932", "shift_jis", "utf-8")
 
-
-HELP_DESK_KEYWORDS = (
-    ("DNS/DKIM/Salesforce support", ("DNS", "DKIM", "Salesforce", "domainkey")),
-    ("mail/log investigation", ("メール", "mail", "email", "@", "SIARICHVE", "ログ")),
-    ("security/server support", ("ESET", "サーバ", "server", "パスワード", "ログイン")),
-    ("Office/iFilter authentication support", ("office", "Office", "iFilter", "ifilter", "認証", "WiFi", "wifi")),
-    ("touchpad/device setting support", ("タッチパッド", "touchpad", "Bluetooth", "デバイスマネージャ", "device manager")),
-    ("software/account investigation", ("アカウント", "問い合わせ", "調査", "確認", "設定変更")),
-)
-
-MAINTENANCE_KEYWORDS = (
-    ("LAN cable/port maintenance", ("LANケーブル", "LANポート", "LANコネクタ", "LAN", "コネクタ")),
-    ("AC adapter or power maintenance", ("ACアダプタ", "AC", "アダプタ", "充電", "電源")),
-    ("mouse maintenance", ("マウス", "ホイール")),
-    ("keyboard/top-cover maintenance", ("キーボード", "キー", "トップカバー")),
-    ("printer/copier maintenance", ("プリンタ", "プリンター", "複合機", "Canon", "PIXUS", "P 6520", "TR703", "PR")),
-    ("hardware repair/replacement", ("HP", "修理", "交換", "破損", "故障", "不具合", "代替機", "設置")),
-)
-
-DATA_HEADERS = [
-    "番号",
+HELP_DESK_HEADERS = [
+    "項番",
     "受付No",
     "受付日",
     "作業完了日",
     "状況",
-    "顧客",
+    "部署",
+    "依頼者",
+    "依頼内容（問い合わせ含む）",
+    "対応内容",
+]
+
+MAINTENANCE_HEADERS = [
+    "項番",
+    "受付No",
+    "受付日",
+    "作業完了日",
+    "状況",
+    "部署",
     "ご担当者",
     "機器名",
-    "物品型式",
+    "修理品型式",
     "製造番号",
     "症状",
     "原因",
     "処置",
 ]
-
-FIELD_ALIASES = {
-    "source_id": ("#", "番号", "No", "ID", "source_id"),
-    "title": ("題名", "件名", "タイトル", "title_raw"),
-    "received_date": ("受付日", "受付日時", "start_date"),
-    "completed_date": ("作業完了日", "完了日", "対応完了日", "作業期限", "期限", "due_date"),
-    "status": ("状況", "状態", "ステータス", "work_type_raw", "classification"),
-    "customer": ("顧客", "顧客名", "依頼元", "requester_or_site_raw"),
-    "person": ("ご担当者", "担当者", "顧客担当者", "contact_raw"),
-    "asset": ("機器名", "機器番号", "資産番号", "ホスト", "asset_id"),
-    "model": ("物品型式", "型式", "機種", "モデル", "model"),
-    "serial": ("製造番号", "シリアル番号", "serial_number"),
-    "symptom": ("症状", "現象", "障害内容", "内容", "issue_raw"),
-    "cause": ("原因", "cause_raw"),
-    "action": ("処置", "処置内容", "対応", "対応内容", "action_raw"),
-}
-
-# Fallback positions for the issue export used in this task.
-FIELD_POSITIONS = {
-    "source_id": 0,
-    "title": 1,
-    "received_date": 2,
-    "completed_date": 3,
-    "status": 4,
-    "customer": 5,
-    "person": 6,
-    "asset": 7,
-    "model": 8,
-    "serial": 9,
-    "symptom": 11,
-    "cause": 12,
-    "action": 13,
-}
 
 
 def parse_args() -> argparse.Namespace:
@@ -132,17 +79,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         default=None,
-        help="Directory where the two Excel files are written. Default: same directory as issues.csv",
-    )
-    parser.add_argument(
-        "--helpdesk-output",
-        default=None,
-        help=f"Full output path for {HELP_DESK_REPORT_NAME}. Overrides --output-dir for this file.",
-    )
-    parser.add_argument(
-        "--maintenance-output",
-        default=None,
-        help=f"Full output path for {MAINTENANCE_REPORT_NAME}. Overrides --output-dir for this file.",
+        help="Directory where the two Excel files are written. Default: same folder as issues.csv",
     )
     parser.add_argument(
         "--gui",
@@ -181,246 +118,196 @@ def read_csv_rows(path: Path) -> tuple[list[str], list[list[str]], str]:
     return header, data_rows, encoding
 
 
-def contains_keyword(text: str, keyword: str) -> bool:
-    if keyword.isascii():
-        return keyword.lower() in text.lower()
-    return keyword in text
+def fullwidth(value: int) -> str:
+    return str(value).translate(str.maketrans("0123456789", "０１２３４５６７８９"))
 
 
-def score_keywords(text: str, keyword_groups: tuple[tuple[str, tuple[str, ...]], ...]) -> tuple[int, str]:
-    score = 0
-    reasons: list[str] = []
-
-    for reason, keywords in keyword_groups:
-        matches = [keyword for keyword in keywords if contains_keyword(text, keyword)]
-        if matches:
-            score += len(matches)
-            reasons.append(reason)
-
-    return score, "; ".join(reasons)
+def previous_month(today: date | None = None) -> tuple[int, int, int]:
+    today = today or date.today()
+    year = today.year
+    month = today.month - 1
+    if month == 0:
+        month = 12
+        year -= 1
+    return year, month, calendar.monthrange(year, month)[1]
 
 
-def classify_row(row: list[str]) -> tuple[str, str]:
-    text = " ".join(cell for cell in row if cell)
-    help_score, help_reason = score_keywords(text, HELP_DESK_KEYWORDS)
-    maintenance_score, maintenance_reason = score_keywords(text, MAINTENANCE_KEYWORDS)
-
-    if "touchpad/device setting support" in help_reason:
-        return "help desk", help_reason
-
-    # Strongly software/service-oriented rows should remain help desk even when they
-    # mention devices as context. Hardware replacement/repair defaults to maintenance.
-    if help_score > 0 and maintenance_score == 0:
-        return "help desk", help_reason
-    if help_score >= maintenance_score + 2:
-        return "help desk", help_reason
-    if maintenance_score > 0:
-        return "maintenance", maintenance_reason
-    return "maintenance", "default: no help desk keyword matched"
-
-
-def normalise_header(header: list[str]) -> list[str]:
-    return [cell.strip() if cell.strip() else f"source_column_{index}" for index, cell in enumerate(header, start=1)]
-
-
-def build_column_map(header: list[str]) -> dict[str, int]:
-    normalised = [cell.strip() for cell in header]
-    column_map: dict[str, int] = {}
-
-    for field, aliases in FIELD_ALIASES.items():
-        for alias in aliases:
-            if alias in normalised:
-                column_map[field] = normalised.index(alias)
-                break
-        if field not in column_map:
-            fallback = FIELD_POSITIONS[field]
-            if fallback < len(header):
-                column_map[field] = fallback
-
-    return column_map
-
-
-def get_value(row: list[str], column_map: dict[str, int], field: str) -> str:
-    index = column_map.get(field)
-    if index is None or index >= len(row):
-        return ""
-    return row[index].strip()
-
-
-def ticket_number(row: list[str], column_map: dict[str, int]) -> str:
-    title = get_value(row, column_map, "title")
-    source_id = get_value(row, column_map, "source_id")
-    for value in (title, source_id):
-        start = value.find("[")
-        end = value.find("]", start + 1)
-        if start != -1 and end != -1:
-            return value[start + 1 : end]
-    return source_id
-
-
-def issue_text(row: list[str], column_map: dict[str, int]) -> str:
-    return " ".join(
-        value
-        for value in (
-            get_value(row, column_map, "symptom"),
-            get_value(row, column_map, "cause"),
-            get_value(row, column_map, "action"),
-        )
-        if value
+def report_filenames(year: int, month: int) -> tuple[str, str]:
+    return (
+        f"1.日立市様ヘルプデスク{year}年{month}月分ご報告.xlsx",
+        f"2.日立市様各種賃貸借契約に対する保守対応定期報告書{year}年{month}月分ご報告.xlsx",
     )
 
 
-def classify_issue(row: list[str], column_map: dict[str, int]) -> tuple[str, str]:
-    text = issue_text(row, column_map)
-    help_score, help_reason = score_keywords(text, HELP_DESK_KEYWORDS)
-    maintenance_score, maintenance_reason = score_keywords(text, MAINTENANCE_KEYWORDS)
-
-    if "touchpad/device setting support" in help_reason:
-        return "help desk", help_reason
-    if help_score > 0 and maintenance_score == 0:
-        return "help desk", help_reason
-    if help_score >= maintenance_score + 2:
-        return "help desk", help_reason
-    if maintenance_score > 0:
-        return "maintenance", maintenance_reason
-    return "maintenance", "default: no help desk keyword matched in 症状/原因/処置"
+def rows_as_dicts(header: list[str], rows: list[list[str]]) -> list[dict[str, str]]:
+    return [dict(zip(header, row)) for row in rows]
 
 
-def report_row(row: list[str], column_map: dict[str, int], number: int) -> list[str]:
-    status = get_value(row, column_map, "status") or "作業完了"
+def value(row: dict[str, str], key: str) -> str:
+    return (row.get(key, "") or "").strip()
+
+
+def filled(text: str) -> str:
+    text = (text or "").strip()
+    return text if text else "ー"
+
+
+def parse_date(text: str):
+    text = (text or "").strip()
+    if not text:
+        return "ー"
+    for fmt in ("%Y/%m/%d", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            pass
+    return text
+
+
+def ticket_number(title: str) -> str:
+    match = re.search(r"\[(HB\d+)\]", title or "")
+    return match.group(1) if match else filled(title)
+
+
+def department_from_title(title: str) -> str:
+    text = re.sub(r"\[HB\d+\]", "", title or "")
+    text = re.sub(r"【[^】]*】", "", text)
+    text = text.replace("日立市役所", "")
+    text = text.replace("日立市", "")
+    text = text.replace("日立保健センター", "保健センター")
+    text = re.sub(r"[\[【].*?[\]】]", "", text)
+    text = text.replace("　", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    return filled(text.strip(" -_　"))
+
+
+def department(row: dict[str, str]) -> str:
+    return value(row, "部署") or department_from_title(value(row, "題名"))
+
+
+def combined_text(row: dict[str, str]) -> str:
+    keys = ("症状", "原因", "処置", "社内メモ", "連絡欄", "最新のコメント")
+    return "\n".join(value(row, key) for key in keys if value(row, key))
+
+
+def is_helpdesk(row: dict[str, str]) -> bool:
+    text = combined_text(row)
+    if any(keyword in text for keyword in ("RDSサーバ", "サーバに接続できない", "CPU負荷", "セッション")):
+        return True
+    if any(keyword in text for keyword in ("ドラムユニット", "消耗品")):
+        return True
+    if any(keyword in text for keyword in ("LANケーブル爪折れ", "コネクタ部の再成端")):
+        return True
+    if any(keyword in text for keyword in ("予備HUB", "バッファロー製HUB", "机島HUB")):
+        return True
+    if ("プリンタ" in text or "プリンター" in text) and any(keyword in text for keyword in ("正常稼働", "様子見")):
+        return True
+    return False
+
+
+def helpdesk_row(row: dict[str, str], number: int) -> list[object]:
     return [
         number,
-        ticket_number(row, column_map),
-        get_value(row, column_map, "received_date"),
-        get_value(row, column_map, "completed_date"),
-        status,
-        get_value(row, column_map, "customer"),
-        get_value(row, column_map, "person"),
-        get_value(row, column_map, "asset"),
-        get_value(row, column_map, "model"),
-        get_value(row, column_map, "serial"),
-        get_value(row, column_map, "symptom"),
-        get_value(row, column_map, "cause"),
-        get_value(row, column_map, "action"),
+        ticket_number(value(row, "題名")),
+        parse_date(value(row, "受付日")),
+        parse_date(value(row, "作業完了日")),
+        filled(value(row, "状況")),
+        department(row),
+        filled(value(row, "客先担当")),
+        filled(value(row, "症状")),
+        filled(value(row, "処置")),
     ]
 
 
-def format_data_sheet(worksheet) -> None:
-    header_fill = PatternFill("solid", fgColor="D9EAF7")
-    header_font = Font(bold=True)
+def maintenance_row(row: dict[str, str], number: int) -> list[object]:
+    return [
+        number,
+        ticket_number(value(row, "題名")),
+        parse_date(value(row, "受付日")),
+        parse_date(value(row, "作業完了日")),
+        filled(value(row, "状況")),
+        department(row),
+        filled(value(row, "客先担当")),
+        filled(value(row, "ホスト")),
+        filled(value(row, "修理品型式")),
+        filled(value(row, "製造番号")),
+        filled(value(row, "症状")),
+        filled(value(row, "原因")),
+        filled(value(row, "処置")),
+    ]
+
+
+def apply_cell_style(cell, *, fill=None, font=None, border=None, alignment=None, number_format=None):
+    if fill is not None:
+        cell.fill = fill
+    if font is not None:
+        cell.font = font
+    if border is not None:
+        cell.border = border
+    if alignment is not None:
+        cell.alignment = alignment
+    if number_format is not None:
+        cell.number_format = number_format
+
+
+def style_report_sheet(ws, widths: list[int], header_row: int = 1, start_col: int = 1, data_start_row: int | None = None) -> None:
+    data_start_row = data_start_row or header_row + 1
     thin = Side(style="thin", color="000000")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-    for cell in worksheet[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        cell.border = border
-
-    for row in worksheet.iter_rows(min_row=2):
+    header_fill = PatternFill("solid", fgColor="D9EAF7")
+    header_font = Font(name="ＭＳ Ｐゴシック", bold=True, size=10)
+    body_font = Font(name="ＭＳ Ｐゴシック", size=10)
+    for row in ws.iter_rows(min_row=header_row, max_row=ws.max_row, min_col=start_col, max_col=start_col + len(widths) - 1):
         for cell in row:
-            cell.alignment = Alignment(vertical="top", wrap_text=True)
-            cell.border = border
-
-    worksheet.freeze_panes = "A2"
-    worksheet.auto_filter.ref = worksheet.dimensions
-
-    for column_cells in worksheet.columns:
-        column_letter = get_column_letter(column_cells[0].column)
-        max_length = max(len(str(cell.value or "")) for cell in column_cells)
-        worksheet.column_dimensions[column_letter].width = min(max(max_length + 2, 12), 60)
-
-
-def add_report_data_sheet(worksheet, report_rows: list[list[str]]) -> None:
-    worksheet.append(DATA_HEADERS)
-    for row in report_rows:
-        worksheet.append(row)
-    format_data_sheet(worksheet)
+            is_header = cell.row == header_row
+            apply_cell_style(
+                cell,
+                fill=header_fill if is_header else None,
+                font=header_font if is_header else body_font,
+                border=border,
+                alignment=Alignment(horizontal="center" if is_header else "left", vertical="center" if is_header else "top", wrap_text=True),
+            )
+            if isinstance(cell.value, datetime):
+                cell.number_format = "yyyy/m/d"
+    for offset, width in enumerate(widths):
+        ws.column_dimensions[get_column_letter(start_col + offset)].width = width
+    ws.freeze_panes = ws.cell(data_start_row, start_col).coordinate
+    ws.auto_filter.ref = f"{get_column_letter(start_col)}{header_row}:{get_column_letter(start_col + len(widths) - 1)}{ws.max_row}"
 
 
-def add_raw_sheet(worksheet, source_header: list[str], source_rows: list[list[str]]) -> None:
-    worksheet.append(normalise_header(source_header))
-    for row in source_rows:
-        worksheet.append(row)
-    format_data_sheet(worksheet)
-
-
-def count_matching(rows: list[list[str]], keywords: tuple[str, ...]) -> int:
-    count = 0
-    for row in rows:
-        text = " ".join(str(cell) for cell in row if cell)
-        if any(contains_keyword(text, keyword) for keyword in keywords):
-            count += 1
-    return count
-
-
-def maintenance_note(rows: list[list[str]]) -> str:
-    parts = [
-        ("マウス交換", count_matching(rows, ("マウス", "ホイール"))),
-        ("ベースエンクロージャー交換", count_matching(rows, ("ベースエンクロージャー", "LANポート"))),
-        ("ACアダプタ交換", count_matching(rows, ("ACアダプタ", "充電", "電源"))),
-        ("LANケーブル対応", count_matching(rows, ("LANケーブル", "LANコネクタ"))),
-        ("キーボード対応", count_matching(rows, ("キーボード", "トップカバー"))),
-        ("プリンタ対応", count_matching(rows, ("プリンタ", "プリンター", "複合機", "Canon", "PIXUS"))),
-    ]
-    visible = [f"{label}:{count}件" for label, count in parts if count]
-    if not visible:
-        return "特にございません。"
-    return "・" + "、".join(visible) + "ございました。"
-
-
-def apply_border(ws, cell_range: str, style: str = "thin") -> None:
-    side = Side(style=style, color="000000")
-    border = Border(left=side, right=side, top=side, bottom=side)
-    for row in ws[cell_range]:
-        for cell in row:
-            cell.border = border
-
-
-def add_maintenance_summary_sheet(worksheet, maintenance_rows: list[list[str]]) -> None:
-    total = len(maintenance_rows)
-    completed = sum(1 for row in maintenance_rows if "完了" in str(row[4]))
-    in_progress = total - completed
-
-    worksheet.title = "特記事項"
-    worksheet.sheet_view.showGridLines = False
-    for column in range(1, 12):
-        worksheet.column_dimensions[get_column_letter(column)].width = 14
-    worksheet.column_dimensions["A"].width = 4
-    worksheet.column_dimensions["B"].width = 16
+def setup_summary_sheet(ws, title: str, period: str, count: int, remarks: str, is_maintenance: bool) -> None:
+    ws.title = "特記事項"
+    ws.sheet_view.showGridLines = False
+    for col in range(1, 12):
+        ws.column_dimensions[get_column_letter(col)].width = 14
+    ws.column_dimensions["A"].width = 12
     for row in range(1, 31):
-        worksheet.row_dimensions[row].height = 20
-
+        ws.row_dimensions[row].height = 20
     yellow = PatternFill("solid", fgColor="FFFF00")
     green = PatternFill("solid", fgColor="C6EFCE")
-    thick = Side(style="medium", color="000000")
     thin = Side(style="thin", color="000000")
     dotted = Side(style="dotted", color="808080")
-
-    worksheet.merge_cells("A3:K3")
-    title_cell = worksheet["A3"]
-    title_cell.value = "日立市役所様 本庁及び出先機関 各種賃貸借契約に対する保守対応＜2026年5月度＞月次作業報告書"
-    title_cell.fill = yellow
-    title_cell.font = Font(bold=True, size=12)
-    title_cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    labels = [
-        (4, "保守期間", "2026年5月1日～2026年5月31日"),
-        (5, "報　告", "エイチ・シー・ネットワークス株式会社"),
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    ws.merge_cells("A3:K3")
+    ws["A3"] = title
+    ws["A3"].fill = yellow
+    ws["A3"].font = Font(name="ＭＳ Ｐゴシック", bold=True, size=12)
+    ws["A3"].alignment = Alignment(horizontal="center", vertical="center")
+    rows = [
+        (4, "保守期間", period),
+        (5, "報    告", "エイチ・シー・ネットワークス株式会社"),
         (6, "責 任 者", "宮本　良一"),
-        (7, "担　当", "保守: 池田 修司　営業: 小瀬 賢弘"),
+        (7, "担    当", "保守：池田 修司 　営業：小瀬 真弘"),
     ]
-    for row_num, label, value in labels:
-        worksheet.merge_cells(start_row=row_num, start_column=2, end_row=row_num, end_column=3)
-        worksheet.merge_cells(start_row=row_num, start_column=4, end_row=row_num, end_column=11)
-        worksheet.cell(row=row_num, column=2, value=label).alignment = Alignment(horizontal="center")
-        worksheet.cell(row=row_num, column=4, value=value)
-
-    worksheet.merge_cells("A8:K8")
-    worksheet["A8"] = "特記事項"
-    worksheet["A8"].fill = green
-    worksheet["A8"].alignment = Alignment(horizontal="center")
-
+    for row_num, label, text in rows:
+        ws.merge_cells(start_row=row_num, start_column=1, end_row=row_num, end_column=3)
+        ws.merge_cells(start_row=row_num, start_column=4, end_row=row_num, end_column=11)
+        ws.cell(row_num, 1, label).alignment = Alignment(horizontal="center", vertical="center")
+        ws.cell(row_num, 4, text)
+    ws.merge_cells("A8:K8")
+    ws["A8"] = "特記事項"
+    ws["A8"].fill = green
+    ws["A8"].alignment = Alignment(horizontal="center")
     sections = [
         (9, 13, "トピックス", ["特にございません。"]),
         (
@@ -428,107 +315,99 @@ def add_maintenance_summary_sheet(worksheet, maintenance_rows: list[list[str]]) 
             19,
             "対応状況",
             [
-                f"今月は、{total}件作業対応になります。",
-                f"詳細は次頁によります。(作業完了：{completed}件、対応中：{in_progress}件)",
-                f"〈内訳は、ハード修理:{total}件となっております。〉",
+                f"今月は、{fullwidth(count)}件{'作業対応' if is_maintenance else '受付対応'}になります。",
+                f"詳細は次紙によります。（{'作業完了' if is_maintenance else '完了'}：{fullwidth(count)}件）",
+                f"（内訳は、ハード修理：{fullwidth(count)}件となっております。）" if is_maintenance else "",
             ],
         ),
         (20, 25, "今月の\n問題点", ["特にございません。"]),
-        (26, 29, "備考", [maintenance_note(maintenance_rows)]),
+        (26, 29, "備考", [remarks]),
     ]
-    for start_row, end_row, label, lines in sections:
-        worksheet.merge_cells(start_row=start_row, start_column=1, end_row=end_row, end_column=2)
-        worksheet.cell(row=start_row, column=1, value=label).alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        for offset, line in enumerate(lines):
-            worksheet.merge_cells(start_row=start_row + offset, start_column=3, end_row=start_row + offset, end_column=11)
-            worksheet.cell(row=start_row + offset, column=3, value=line).alignment = Alignment(wrap_text=True, vertical="top")
-        for row_num in range(start_row, end_row + 1):
-            for col_num in range(3, 12):
-                worksheet.cell(row=row_num, column=col_num).border = Border(bottom=dotted)
-
-    apply_border(worksheet, "A3:K29")
-    for cell in worksheet["A3:K3"][0]:
-        cell.border = Border(left=thin, right=thin, top=thick, bottom=thin)
-
-
-def write_helpdesk_workbook(
-    path: Path,
-    source_header: list[str],
-    source_rows: list[list[str]],
-    helpdesk_rows: list[list[str]],
-) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    workbook = Workbook()
-    worksheet = workbook.active
-    worksheet.title = HELP_DESK_SHEET_NAME
-    add_report_data_sheet(worksheet, helpdesk_rows)
-    raw_sheet = workbook.create_sheet("元データ")
-    add_raw_sheet(raw_sheet, source_header, source_rows)
-    workbook.save(path)
+    for start, end, label, lines in sections:
+        ws.merge_cells(start_row=start, start_column=1, end_row=end, end_column=1)
+        ws.cell(start, 1, label).alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        for idx, line in enumerate(line for line in lines if line):
+            ws.merge_cells(start_row=start + idx, start_column=2, end_row=start + idx, end_column=11)
+            ws.cell(start + idx, 2, line).alignment = Alignment(vertical="top", wrap_text=True)
+        for row in range(start, end + 1):
+            for col in range(2, 12):
+                ws.cell(row, col).border = Border(bottom=dotted)
+    for row in ws.iter_rows(min_row=3, max_row=29, min_col=1, max_col=11):
+        for cell in row:
+            if cell.row <= 8 or cell.column == 1:
+                cell.border = border
+            cell.font = Font(name="ＭＳ Ｐゴシック", size=10, bold=cell.row in (3, 8))
 
 
-def write_maintenance_workbook(
-    path: Path,
-    source_header: list[str],
-    source_rows: list[list[str]],
-    maintenance_rows: list[list[str]],
-) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    workbook = Workbook()
-    summary_sheet = workbook.active
-    add_maintenance_summary_sheet(summary_sheet, maintenance_rows)
-    data_sheet = workbook.create_sheet("データ")
-    add_report_data_sheet(data_sheet, maintenance_rows)
-    raw_sheet = workbook.create_sheet("元データ2")
-    add_raw_sheet(raw_sheet, source_header, source_rows)
-    workbook.save(path)
+def maintenance_remarks(rows: list[dict[str, str]]) -> str:
+    mouse = sum(1 for row in rows if "マウス" in combined_text(row))
+    base = sum(1 for row in rows if "ベースエンクロージャ" in combined_text(row) or "ベースエンクロージャー" in combined_text(row))
+    ac = 0
+    for row in rows:
+        action_text = "\n".join(value(row, key) for key in ("処置", "連絡欄", "社内メモ"))
+        if ("ACアダプタ" in action_text or "アダプタ" in action_text) and "マザーボード" not in action_text:
+            ac += 1
+    return f"・マウス交換：{fullwidth(mouse)}件、ベースエンクロージャー交換：{fullwidth(base)}件、ACアダプタ交換：{fullwidth(ac)}件ございました。"
 
 
-def output_paths(args: argparse.Namespace, issues_csv: Path) -> tuple[Path, Path]:
-    output_dir = Path(args.output_dir) if args.output_dir else issues_csv.parent
-    helpdesk_output = Path(args.helpdesk_output) if args.helpdesk_output else output_dir / HELP_DESK_REPORT_NAME
-    maintenance_output = (
-        Path(args.maintenance_output)
-        if args.maintenance_output
-        else output_dir / MAINTENANCE_REPORT_NAME
-    )
-    return helpdesk_output, maintenance_output
+def write_helpdesk_workbook(path: Path, rows: list[dict[str, str]], year: int, month: int, last_day: int) -> None:
+    wb = Workbook()
+    summary = wb.active
+    title = f"日立市役所様 本庁及び出先機関ヘルプデスク保守サービス＜{fullwidth(year)}年{fullwidth(month)}月度＞月次報告書"
+    period = f"{fullwidth(year)}年{fullwidth(month)}月1日～{fullwidth(year)}年{fullwidth(month)}月{fullwidth(last_day)}日"
+    setup_summary_sheet(summary, title, period, len(rows), "特にございません。", False)
+    ws = wb.create_sheet("データ")
+    ws.append(HELP_DESK_HEADERS)
+    for index, row in enumerate(rows, start=1):
+        ws.append(helpdesk_row(row, index))
+    style_report_sheet(ws, [8, 12, 13, 13, 12, 24, 18, 50, 60])
+    wb.save(path)
 
 
-def generate_reports(
-    issues_csv: Path,
-    output_dir: Path | None = None,
-    helpdesk_output: Path | None = None,
-    maintenance_output: Path | None = None,
-) -> dict[str, object]:
+def write_maintenance_workbook(path: Path, all_rows: list[tuple[dict[str, str], str]], maintenance_rows: list[dict[str, str]], year: int, month: int, last_day: int) -> None:
+    wb = Workbook()
+    title = f"日立市役所様 本庁及び出先機関 各種賃貸借契約に対する保守対応＜{fullwidth(year)}年{fullwidth(month)}月度＞月次作業報告書"
+    period = f"{fullwidth(year)}年{fullwidth(month)}月1日～{fullwidth(year)}年{fullwidth(month)}月{fullwidth(last_day)}日"
+    setup_summary_sheet(wb.active, title, period, len(maintenance_rows), maintenance_remarks(maintenance_rows), True)
+    data = wb.create_sheet("データ")
+    data.append(MAINTENANCE_HEADERS)
+    for index, row in enumerate(maintenance_rows, start=1):
+        data.append(maintenance_row(row, index))
+    style_report_sheet(data, [6, 12, 13, 13, 12, 22, 18, 16, 18, 18, 46, 46, 56])
+    raw = wb.create_sheet("元データ２")
+    for _ in range(1):
+        raw.append([])
+    raw.append(["", *MAINTENANCE_HEADERS])
+    helpdesk_fill = PatternFill("solid", fgColor="DDEBF7")
+    for index, (row, classification) in enumerate(all_rows, start=1):
+        raw.append(["", *maintenance_row(row, index)])
+        if classification == "helpdesk":
+            for cell in raw[raw.max_row][1:]:
+                cell.fill = copy(helpdesk_fill)
+    style_report_sheet(raw, [6, 12, 13, 13, 12, 22, 18, 16, 18, 18, 46, 46, 56], header_row=2, start_col=2, data_start_row=3)
+    wb.save(path)
+
+
+def generate_reports(issues_csv: Path, output_dir: Path | None = None) -> dict[str, object]:
     if not issues_csv.exists():
         raise FileNotFoundError(f"CSV file not found: {issues_csv}")
-
     source_header, source_rows, encoding = read_csv_rows(issues_csv)
-    column_map = build_column_map(source_header)
-    classified_rows = [(row, *classify_issue(row, column_map)) for row in source_rows]
-    helpdesk_rows = []
-    maintenance_rows = []
-    for row, classification, _reason in classified_rows:
-        if classification == "help desk":
-            helpdesk_rows.append(report_row(row, column_map, len(helpdesk_rows) + 1))
-        else:
-            maintenance_rows.append(report_row(row, column_map, len(maintenance_rows) + 1))
-
-    output_dir = output_dir if output_dir else issues_csv.parent
-    helpdesk_path = helpdesk_output if helpdesk_output else output_dir / HELP_DESK_REPORT_NAME
-    maintenance_path = (
-        maintenance_output
-        if maintenance_output
-        else output_dir / MAINTENANCE_REPORT_NAME
-    )
-    write_helpdesk_workbook(helpdesk_path, source_header, source_rows, helpdesk_rows)
-    write_maintenance_workbook(maintenance_path, source_header, source_rows, maintenance_rows)
-
+    rows = rows_as_dicts(source_header, source_rows)
+    classified = [(row, "helpdesk" if is_helpdesk(row) else "maintenance") for row in rows]
+    helpdesk_rows = [row for row, classification in classified if classification == "helpdesk"]
+    maintenance_rows = [row for row, classification in classified if classification == "maintenance"]
+    year, month, last_day = previous_month()
+    helpdesk_name, maintenance_name = report_filenames(year, month)
+    output_dir = output_dir or issues_csv.parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+    helpdesk_path = output_dir / helpdesk_name
+    maintenance_path = output_dir / maintenance_name
+    write_helpdesk_workbook(helpdesk_path, helpdesk_rows, year, month, last_day)
+    write_maintenance_workbook(maintenance_path, classified, maintenance_rows, year, month, last_day)
     return {
         "issues_csv": issues_csv,
         "encoding": encoding,
-        "total": len(source_rows),
+        "total": len(rows),
         "helpdesk_count": len(helpdesk_rows),
         "maintenance_count": len(maintenance_rows),
         "helpdesk_output": helpdesk_path,
@@ -557,14 +436,9 @@ def run_gui() -> int:
 
     desktop_dir = Path.home() / "Desktop"
     initial_dir = desktop_dir if desktop_dir.exists() else Path(issues_file).parent
-    output_dir = filedialog.askdirectory(
-        title="Excelファイルの保存先フォルダを選択してください",
-        initialdir=str(initial_dir),
-    )
-    output_path = Path(output_dir) if output_dir else initial_dir
-
     try:
-        result = generate_reports(Path(issues_file), output_dir=output_path)
+        # The outputs are intentionally saved next to the selected issues.csv.
+        result = generate_reports(Path(issues_file), output_dir=Path(issues_file).parent)
     except Exception as exc:
         messagebox.showerror("Report generation failed", str(exc))
         return 1
@@ -579,6 +453,7 @@ def run_gui() -> int:
                 f"Help desk: {result['helpdesk_count']}",
                 f"Maintenance: {result['maintenance_count']}",
                 "",
+                "Saved in the same folder as the selected CSV:",
                 f"1) {result['helpdesk_output']}",
                 f"2) {result['maintenance_output']}",
             ]
@@ -593,15 +468,9 @@ def main() -> int:
         return run_gui()
 
     issues_csv = Path(args.issues_csv)
-    helpdesk_output, maintenance_output = output_paths(args, issues_csv)
 
     try:
-        result = generate_reports(
-            issues_csv,
-            output_dir=Path(args.output_dir) if args.output_dir else None,
-            helpdesk_output=helpdesk_output,
-            maintenance_output=maintenance_output,
-        )
+        result = generate_reports(issues_csv, output_dir=Path(args.output_dir) if args.output_dir else None)
     except Exception as exc:
         print(str(exc), file=sys.stderr)
         return 1
