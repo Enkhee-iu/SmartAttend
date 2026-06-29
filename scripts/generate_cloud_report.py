@@ -5,8 +5,11 @@ from __future__ import annotations
 import re
 import shutil
 import sys
+import tempfile
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from openpyxl import load_workbook
 
@@ -222,6 +225,108 @@ def populate_target_sheet(target_ws, source_ws, config: dict, data_yyyymm: str) 
         row[0].number_format = "yyyy-mm-dd hh:mm:ss"
 
 
+def add_content_type_override(root, part_name: str, content_type: str) -> None:
+    namespace = "http://schemas.openxmlformats.org/package/2006/content-types"
+    existing = {
+        element.attrib.get("PartName")
+        for element in root.findall(f"{{{namespace}}}Override")
+    }
+    if part_name in existing:
+        return
+    ET.SubElement(root, f"{{{namespace}}}Override", PartName=part_name, ContentType=content_type)
+
+
+def add_workbook_connection_relationship(root) -> None:
+    namespace = "http://schemas.openxmlformats.org/package/2006/relationships"
+    connection_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections"
+    for element in root.findall(f"{{{namespace}}}Relationship"):
+        if element.attrib.get("Type") == connection_type:
+            return
+    used_ids = {
+        element.attrib.get("Id", "")
+        for element in root.findall(f"{{{namespace}}}Relationship")
+    }
+    next_index = 1
+    while f"rId{next_index}" in used_ids:
+        next_index += 1
+    ET.SubElement(
+        root,
+        f"{{{namespace}}}Relationship",
+        Id=f"rId{next_index}",
+        Type=connection_type,
+        Target="connections.xml",
+    )
+
+
+def restore_query_table_metadata(template_path: Path, workbook_path: Path) -> None:
+    """Restore Excel query-table metadata removed by openpyxl.
+
+    The HCNET workbook contains Excel tables backed by queryTable/external data
+    range metadata. openpyxl preserves the visible cells and charts, but it drops
+    these unsupported package parts when saving. Excel then repairs the workbook
+    by deleting the external data ranges. Restoring these parts keeps the workbook
+    opening cleanly and preserves table behavior.
+    """
+    with ZipFile(template_path) as template_zip, ZipFile(workbook_path) as generated_zip:
+        template_names = set(template_zip.namelist())
+        generated_names = set(generated_zip.namelist())
+
+        restore_names = [
+            name
+            for name in template_names
+            if name.startswith("xl/queryTables/")
+            or name.startswith("xl/tables/_rels/")
+            or name == "xl/connections.xml"
+        ]
+
+        content_root = ET.fromstring(generated_zip.read("[Content_Types].xml"))
+        if "xl/connections.xml" in restore_names:
+            add_content_type_override(
+                content_root,
+                "/xl/connections.xml",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml",
+            )
+        for name in restore_names:
+            if name.startswith("xl/queryTables/") and name.endswith(".xml"):
+                add_content_type_override(
+                    content_root,
+                    "/" + name,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml",
+                )
+
+        workbook_rels_root = ET.fromstring(generated_zip.read("xl/_rels/workbook.xml.rels"))
+        if "xl/connections.xml" in restore_names:
+            add_workbook_connection_relationship(workbook_rels_root)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
+            tmp_path = Path(tmp_file.name)
+
+        try:
+            with ZipFile(tmp_path, "w", ZIP_DEFLATED) as output_zip:
+                for name in generated_zip.namelist():
+                    if name in {"[Content_Types].xml", "xl/_rels/workbook.xml.rels"}:
+                        continue
+                    if name in restore_names:
+                        continue
+                    output_zip.writestr(name, generated_zip.read(name))
+
+                output_zip.writestr(
+                    "[Content_Types].xml",
+                    ET.tostring(content_root, encoding="utf-8", xml_declaration=True),
+                )
+                output_zip.writestr(
+                    "xl/_rels/workbook.xml.rels",
+                    ET.tostring(workbook_rels_root, encoding="utf-8", xml_declaration=True),
+                )
+                for name in restore_names:
+                    output_zip.writestr(name, template_zip.read(name))
+
+            shutil.move(tmp_path, workbook_path)
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink()
+
+
 def output_filename(report_yyyymm: str) -> str:
     return f"HCNETプライベートクラウド月次報告_グラフ込み({report_yyyymm})原本_20260424.xlsx"
 
@@ -260,6 +365,7 @@ def generate_cloud_report(
         populate_target_sheet(target_ws, source_wb[source_sheet_name], config, data_yyyymm)
 
     target_wb.save(output_path)
+    restore_query_table_metadata(template_path, output_path)
     return output_path
 
 
