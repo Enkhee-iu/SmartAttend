@@ -1,0 +1,50 @@
+name: Build Issue Report EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "cursor/**"
+    paths:
+      - "scripts/generate_issue_reports.py"
+      - "scripts/generate_cloud_report.py"
+      - "scripts/hcnet_report_launcher.py"
+      - "requirements.txt"
+      - "templates/hcnet_cloud_monthly_template.xlsx"
+      - "build_issue_report_exe.bat"
+      - "windows_as_invoker.manifest"
+      - ".github/workflows/build-issue-report-exe.yml"
+
+jobs:
+  build-windows-exe:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Build EXE
+        run: |
+          python -m PyInstaller --onefile --windowed --manifest windows_as_invoker.manifest --add-data "templates\\hcnet_cloud_monthly_template.xlsx;templates" --name IssueReportGenerator scripts/hcnet_report_launcher.py
+
+      - name: Package EXE
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\IssueReportGenerator.exe -DestinationPath issue_report_generator_exe.zip -Force
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-report-generator-exe
+          path: issue_report_generator_exe.zip
