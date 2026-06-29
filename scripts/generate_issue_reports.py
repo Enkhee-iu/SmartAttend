@@ -65,32 +65,10 @@ MAINTENANCE_HEADERS = [
     "処置",
 ]
 
-STRONG_MAINTENANCE_KEYWORDS = (
-    "マウスを交換",
-    "マウスの交換",
-    "マウス交換",
-    "交換機の設置",
-    "故障機の回収",
-    "ACアダプタ",
-    "アダプタの交換",
-    "ベースエンクロージャ",
-    "ベースエンクロージャー",
-    "トップカバー",
-    "キーボード",
-    "マザーボード",
-    "IOボード",
-    "定着ユニット",
-    "メーカー修理",
-    "HP修理",
-    "富士通",
-    "修理申込番号",
-    "修理受付番号",
-    "代替機",
-    "見積",
-    "カバーが取れ",
-    "破損部",
-)
-
+HELPDESK_MARKER = "ヘルプデスク"
+MAINTENANCE_MARKER = "賃貸借契約"
+MISSING_MARKER_FLAG = "missing_marker"
+SPLIT_MARKER_FLAG = "split_marker"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -226,96 +204,27 @@ def combined_text(row: dict[str, str]) -> str:
     return "\n".join(value(row, key) for key in keys if value(row, key))
 
 
-def has_strong_maintenance(row: dict[str, str]) -> bool:
-    text = combined_text(row)
-    return any(keyword in text for keyword in STRONG_MAINTENANCE_KEYWORDS)
+def split_work_items(row: dict[str, str]) -> list[tuple[dict[str, str], str, str]]:
+    """Classify work items from the markers in 連絡欄.
 
-
-def has_lan_cable_helpdesk_work(row: dict[str, str]) -> bool:
-    text = combined_text(row)
-    action_text = "\n".join(value(row, key) for key in ("処置", "連絡欄") if value(row, key))
-    if "LANケーブル爪折れ" in text or "LANケーブルの爪折れ" in text:
-        return True
-    if "コネクタ部" in text and "再成端" in text:
-        return True
-    return "LANケーブル" in action_text and any(keyword in action_text for keyword in ("修繕", "交換", "再成端"))
-
-
-def extract_lan_cable_work(row: dict[str, str]) -> str:
-    text = "\n".join(value(row, key) for key in ("症状", "原因", "処置", "連絡欄") if value(row, key))
-    parts = re.split(r"(?<=。)|\n|、", text)
-    matches = [
-        part.strip()
-        for part in parts
-        if (
-            ("LANケーブル" in part and any(keyword in part for keyword in ("爪折れ", "修繕", "交換", "再成端")))
-            or ("コネクタ部" in part and "再成端" in part)
-        )
-    ]
-    return "、".join(match for match in matches if match) or "LANケーブル修繕対応"
-
-
-def without_lan_cable_work(text: str) -> str:
-    parts = re.split(r"(?<=。)|\n", text or "")
-    kept = [
-        part.strip()
-        for part in parts
-        if not (
-            ("LANケーブル" in part and any(keyword in part for keyword in ("爪折れ", "修繕", "交換", "再成端")))
-            or ("コネクタ部" in part and "再成端" in part)
-        )
-    ]
-    return "\n".join(part for part in kept if part)
-
-
-def split_work_items(row: dict[str, str]) -> list[tuple[dict[str, str], str]]:
-    """Return one or more work items for a ticket.
-
-    A single ticket can contain both hardware maintenance and help desk cable
-    work. In that case the ticket is split into two output rows so both reports
-    receive the correct work item.
+    The markers are authoritative:
+    - ヘルプデスク only -> help desk
+    - 賃貸借契約 only -> maintenance
+    - both -> split into one row for each report
+    - neither -> maintenance with a red-font warning marker
     """
-    if has_strong_maintenance(row) and has_lan_cable_helpdesk_work(row):
-        maintenance = row.copy()
-        maintenance["処置"] = without_lan_cable_work(value(row, "処置")) or value(row, "処置")
+    contact = value(row, "連絡欄")
+    has_helpdesk_marker = HELPDESK_MARKER in contact
+    has_maintenance_marker = MAINTENANCE_MARKER in contact
 
-        helpdesk = row.copy()
-        lan_work = extract_lan_cable_work(row)
-        helpdesk["症状"] = lan_work
-        helpdesk["原因"] = "LANケーブル対応"
-        helpdesk["処置"] = lan_work
-        return [(maintenance, "maintenance"), (helpdesk, "helpdesk")]
-
-    return [(row, "helpdesk" if is_helpdesk(row) else "maintenance")]
-
-
-def is_helpdesk(row: dict[str, str]) -> bool:
-    text = combined_text(row)
-    if has_strong_maintenance(row):
-        return False
-    if any(keyword in text for keyword in ("Office製品", "office製品", "iFilter", "ifilter", "MSサーバ", "通信許可", "設定変更")):
-        return True
-    if "認証" in text and any(keyword in text for keyword in ("Office", "office", "iFilter", "ifilter", "MS", "サーバ")):
-        return True
-    if any(keyword in text for keyword in ("ESET", "管理者パスワード", "メーカ問い合わせ", "情報収集")):
-        return True
-    if any(keyword in text for keyword in ("メール配送", "送信元", "送信先", "メールサーバ", "ログを調査", "ログ調査")):
-        return True
-    if any(keyword in text for keyword in ("タッチパッド", "デバイスマネージャー", "管理者権限")):
-        return True
-    if any(keyword in text for keyword in ("DNSレコード", "Salesforce", "DKIM", "domainkey", "IIJ", "digコマンド", "CNAME")):
-        return True
-    if any(keyword in text for keyword in ("RDSサーバ", "サーバに接続できない", "CPU負荷", "セッション")):
-        return True
-    if any(keyword in text for keyword in ("ドラムユニット", "消耗品")):
-        return True
-    if any(keyword in text for keyword in ("LANケーブル爪折れ", "コネクタ部の再成端")):
-        return True
-    if any(keyword in text for keyword in ("予備HUB", "バッファロー製HUB", "机島HUB")):
-        return True
-    if ("プリンタ" in text or "プリンター" in text) and any(keyword in text for keyword in ("正常稼働", "様子見")):
-        return True
-    return False
+    if has_helpdesk_marker and has_maintenance_marker:
+        return [(row.copy(), "maintenance", SPLIT_MARKER_FLAG), (row.copy(), "helpdesk", SPLIT_MARKER_FLAG)]
+    if has_helpdesk_marker:
+        return [(row, "helpdesk", "")]
+    if has_maintenance_marker:
+        return [(row, "maintenance", "")]
+    if not has_helpdesk_marker and not has_maintenance_marker:
+        return [(row, "maintenance", MISSING_MARKER_FLAG)]
 
 
 def helpdesk_row(row: dict[str, str], number: int) -> list[object]:
@@ -395,6 +304,19 @@ def style_report_sheet(
     ws.freeze_panes = ws.cell(data_start_row, start_col).coordinate
 
 
+def mark_output_row(ws, row_number: int, start_col: int, column_count: int, flag: str) -> None:
+    if not flag:
+        return
+    split_fill = PatternFill("solid", fgColor="D9D9D9")
+    red_font = Font(name="ＭＳ Ｐゴシック", size=10, color="FF0000")
+    for col in range(start_col, start_col + column_count):
+        cell = ws.cell(row_number, col)
+        if flag == SPLIT_MARKER_FLAG:
+            cell.fill = copy(split_fill)
+        elif flag == MISSING_MARKER_FLAG:
+            cell.font = copy(red_font)
+
+
 def setup_summary_sheet(ws, title: str, period: str, count: int, remarks: str, is_maintenance: bool) -> None:
     ws.title = "特記事項"
     ws.sheet_view.showGridLines = False
@@ -459,18 +381,18 @@ def setup_summary_sheet(ws, title: str, period: str, count: int, remarks: str, i
             cell.font = Font(name="ＭＳ Ｐゴシック", size=10, bold=cell.row in (3, 8))
 
 
-def maintenance_remarks(rows: list[dict[str, str]]) -> str:
-    mouse = sum(1 for row in rows if "マウス" in combined_text(row))
-    base = sum(1 for row in rows if "ベースエンクロージャ" in combined_text(row) or "ベースエンクロージャー" in combined_text(row))
+def maintenance_remarks(rows: list[tuple[dict[str, str], str]]) -> str:
+    mouse = sum(1 for row, _flag in rows if "マウス" in combined_text(row))
+    base = sum(1 for row, _flag in rows if "ベースエンクロージャ" in combined_text(row) or "ベースエンクロージャー" in combined_text(row))
     ac = 0
-    for row in rows:
+    for row, _flag in rows:
         action_text = "\n".join(value(row, key) for key in ("処置", "連絡欄", "社内メモ"))
         if ("ACアダプタ" in action_text or "アダプタ" in action_text) and "マザーボード" not in action_text:
             ac += 1
     return f"・マウス交換：{fullwidth(mouse)}件、ベースエンクロージャー交換：{fullwidth(base)}件、ACアダプタ交換：{fullwidth(ac)}件ございました。"
 
 
-def write_helpdesk_workbook(path: Path, rows: list[dict[str, str]], year: int, month: int, last_day: int) -> None:
+def write_helpdesk_workbook(path: Path, rows: list[tuple[dict[str, str], str]], year: int, month: int, last_day: int) -> None:
     wb = Workbook()
     summary = wb.active
     title = f"日立市役所様 本庁及び出先機関ヘルプデスク保守サービス＜{fullwidth(year)}年{fullwidth(month)}月度＞月次報告書"
@@ -478,7 +400,7 @@ def write_helpdesk_workbook(path: Path, rows: list[dict[str, str]], year: int, m
     setup_summary_sheet(summary, title, period, len(rows), "特にございません。", False)
     ws = wb.create_sheet("データ")
     ws.append(HELP_DESK_HEADERS)
-    for index, row in enumerate(rows, start=1):
+    for index, (row, _flag) in enumerate(rows, start=1):
         ws.append(helpdesk_row(row, index))
     style_report_sheet(
         ws,
@@ -486,17 +408,26 @@ def write_helpdesk_workbook(path: Path, rows: list[dict[str, str]], year: int, m
         left_aligned_columns={8, 9},
         border_style="medium",
     )
+    for row_number, (_row, flag) in enumerate(rows, start=2):
+        mark_output_row(ws, row_number, 1, len(HELP_DESK_HEADERS), flag)
     wb.save(path)
 
 
-def write_maintenance_workbook(path: Path, all_rows: list[tuple[dict[str, str], str]], maintenance_rows: list[dict[str, str]], year: int, month: int, last_day: int) -> None:
+def write_maintenance_workbook(
+    path: Path,
+    all_rows: list[tuple[dict[str, str], str, str]],
+    maintenance_rows: list[tuple[dict[str, str], str]],
+    year: int,
+    month: int,
+    last_day: int,
+) -> None:
     wb = Workbook()
     title = f"日立市役所様 本庁及び出先機関 各種賃貸借契約に対する保守対応＜{fullwidth(year)}年{fullwidth(month)}月度＞月次作業報告書"
     period = f"{fullwidth(year)}年{fullwidth(month)}月1日～{fullwidth(year)}年{fullwidth(month)}月{fullwidth(last_day)}日"
     setup_summary_sheet(wb.active, title, period, len(maintenance_rows), maintenance_remarks(maintenance_rows), True)
     data = wb.create_sheet("データ")
     data.append(MAINTENANCE_HEADERS)
-    for index, row in enumerate(maintenance_rows, start=1):
+    for index, (row, _flag) in enumerate(maintenance_rows, start=1):
         data.append(maintenance_row(row, index))
     style_report_sheet(
         data,
@@ -504,17 +435,21 @@ def write_maintenance_workbook(path: Path, all_rows: list[tuple[dict[str, str], 
         left_aligned_columns={11, 12, 13},
         border_style="medium",
     )
+    for row_number, (_row, flag) in enumerate(maintenance_rows, start=2):
+        mark_output_row(data, row_number, 1, len(MAINTENANCE_HEADERS), flag)
     raw = wb.create_sheet("元データ２")
     for _ in range(1):
         raw.append([])
     raw.append(["", *MAINTENANCE_HEADERS])
     helpdesk_fill = PatternFill("solid", fgColor="DDEBF7")
-    for index, (row, classification) in enumerate(all_rows, start=1):
+    for index, (row, classification, flag) in enumerate(all_rows, start=1):
         raw.append(["", *maintenance_row(row, index)])
         if classification == "helpdesk":
             for cell in raw[raw.max_row][1:]:
                 cell.fill = copy(helpdesk_fill)
     style_report_sheet(raw, [6, 12, 13, 13, 12, 22, 18, 16, 18, 18, 46, 46, 56], header_row=2, start_col=2, data_start_row=3)
+    for row_number, (_row, _classification, flag) in enumerate(all_rows, start=3):
+        mark_output_row(raw, row_number, 2, len(MAINTENANCE_HEADERS), flag)
     wb.save(path)
 
 
@@ -524,8 +459,8 @@ def generate_reports(issues_csv: Path, output_dir: Path | None = None) -> dict[s
     source_header, source_rows, encoding = read_csv_rows(issues_csv)
     rows = sorted(rows_as_dicts(source_header, source_rows), key=sort_key)
     classified = [item for row in rows for item in split_work_items(row)]
-    helpdesk_rows = [row for row, classification in classified if classification == "helpdesk"]
-    maintenance_rows = [row for row, classification in classified if classification == "maintenance"]
+    helpdesk_rows = [(row, flag) for row, classification, flag in classified if classification == "helpdesk"]
+    maintenance_rows = [(row, flag) for row, classification, flag in classified if classification == "maintenance"]
     year, month, last_day = previous_month()
     helpdesk_name, maintenance_name = report_filenames(year, month)
     output_dir = output_dir or issues_csv.parent
