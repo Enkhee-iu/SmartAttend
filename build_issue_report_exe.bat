@@ -14,7 +14,7 @@ python -m PyInstaller ^
   --onefile ^
   --windowed ^
   --name IssueReportGenerator ^
-  scripts\generate_issue_reports.py
+  scripts\hcnet_report_launcher.py
 
 echo.
 echo Build completed.

@@ -7,6 +7,8 @@ on:
       - "cursor/**"
     paths:
       - "scripts/generate_issue_reports.py"
+      - "scripts/generate_cloud_report.py"
+      - "scripts/hcnet_report_launcher.py"
       - "requirements.txt"
       - "build_issue_report_exe.bat"
       - ".github/workflows/build-issue-report-exe.yml"
@@ -32,7 +34,7 @@ jobs:
 
       - name: Build EXE
         run: |
-          python -m PyInstaller --onefile --windowed --name IssueReportGenerator scripts/generate_issue_reports.py
+          python -m PyInstaller --onefile --windowed --name IssueReportGenerator scripts/hcnet_report_launcher.py
 
       - name: Package EXE
         shell: pwsh
