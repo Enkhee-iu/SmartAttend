@@ -168,14 +168,11 @@ def parse_date(text: str):
     return text
 
 
-def sort_key(row: dict[str, str]) -> tuple[datetime, datetime, str]:
+def sort_key(row: dict[str, str]) -> tuple[datetime, str]:
     received_date = parse_date(value(row, "受付日"))
     if not isinstance(received_date, datetime):
         received_date = datetime.min
-    completed_date = parse_date(value(row, "作業完了日"))
-    if not isinstance(completed_date, datetime):
-        completed_date = datetime.min
-    return received_date, completed_date, ticket_number(value(row, "題名"))
+    return received_date, ticket_number(value(row, "題名"))
 
 
 def ticket_number(title: str) -> str:
@@ -229,7 +226,7 @@ def split_work_items(row: dict[str, str]) -> list[tuple[dict[str, str], str, str
 
 def helpdesk_row(row: dict[str, str], number: int) -> list[object]:
     return [
-        number,
+        "=ROW()-1",
         ticket_number(value(row, "題名")),
         parse_date(value(row, "受付日")),
         parse_date(value(row, "作業完了日")),
@@ -243,7 +240,7 @@ def helpdesk_row(row: dict[str, str], number: int) -> list[object]:
 
 def maintenance_row(row: dict[str, str], number: int) -> list[object]:
     return [
-        number,
+        "=ROW()-1",
         ticket_number(value(row, "題名")),
         parse_date(value(row, "受付日")),
         parse_date(value(row, "作業完了日")),
@@ -443,7 +440,9 @@ def write_maintenance_workbook(
     raw.append(["", *MAINTENANCE_HEADERS])
     helpdesk_fill = PatternFill("solid", fgColor="DDEBF7")
     for index, (row, classification, flag) in enumerate(all_rows, start=1):
-        raw.append(["", *maintenance_row(row, index)])
+        raw_row = maintenance_row(row, index)
+        raw_row[0] = "=ROW()-2"
+        raw.append(["", *raw_row])
         if classification == "helpdesk":
             for cell in raw[raw.max_row][1:]:
                 cell.fill = copy(helpdesk_fill)
