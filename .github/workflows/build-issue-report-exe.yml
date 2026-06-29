@@ -11,6 +11,7 @@ on:
       - "scripts/hcnet_report_launcher.py"
       - "requirements.txt"
       - "build_issue_report_exe.bat"
+      - "windows_as_invoker.manifest"
       - ".github/workflows/build-issue-report-exe.yml"
 
 jobs:
@@ -34,7 +35,7 @@ jobs:
 
       - name: Build EXE
         run: |
-          python -m PyInstaller --onefile --windowed --name IssueReportGenerator scripts/hcnet_report_launcher.py
+          python -m PyInstaller --onefile --windowed --manifest windows_as_invoker.manifest --name IssueReportGenerator scripts/hcnet_report_launcher.py
 
       - name: Package EXE
         shell: pwsh

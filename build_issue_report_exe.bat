@@ -13,6 +13,7 @@ if exist IssueReportGenerator.spec del /q IssueReportGenerator.spec
 python -m PyInstaller ^
   --onefile ^
   --windowed ^
+  --manifest windows_as_invoker.manifest ^
   --name IssueReportGenerator ^
   scripts\hcnet_report_launcher.py
 

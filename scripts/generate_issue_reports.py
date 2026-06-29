@@ -456,6 +456,8 @@ def generate_reports(issues_csv: Path, output_dir: Path | None = None) -> dict[s
     if not issues_csv.exists():
         raise FileNotFoundError(f"CSV file not found: {issues_csv}")
     source_header, source_rows, encoding = read_csv_rows(issues_csv)
+    if "連絡欄" not in source_header:
+        raise ValueError("選択されたCSVに「連絡欄」列がありません。処理を中断しました。")
     rows = sorted(rows_as_dicts(source_header, source_rows), key=sort_key)
     classified = [item for row in rows for item in split_work_items(row)]
     helpdesk_rows = [(row, flag) for row, classification, flag in classified if classification == "helpdesk"]
