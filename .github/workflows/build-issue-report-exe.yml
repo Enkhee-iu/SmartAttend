@@ -10,6 +10,7 @@ on:
       - "scripts/generate_cloud_report.py"
       - "scripts/hcnet_report_launcher.py"
       - "requirements.txt"
+      - "templates/hcnet_cloud_monthly_template.xlsx"
       - "build_issue_report_exe.bat"
       - "windows_as_invoker.manifest"
       - ".github/workflows/build-issue-report-exe.yml"
@@ -35,7 +36,7 @@ jobs:
 
       - name: Build EXE
         run: |
-          python -m PyInstaller --onefile --windowed --manifest windows_as_invoker.manifest --name IssueReportGenerator scripts/hcnet_report_launcher.py
+          python -m PyInstaller --onefile --windowed --manifest windows_as_invoker.manifest --add-data "templates\\hcnet_cloud_monthly_template.xlsx;templates" --name IssueReportGenerator scripts/hcnet_report_launcher.py
 
       - name: Package EXE
         shell: pwsh

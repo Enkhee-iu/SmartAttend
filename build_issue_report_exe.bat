@@ -14,6 +14,7 @@ python -m PyInstaller ^
   --onefile ^
   --windowed ^
   --manifest windows_as_invoker.manifest ^
+  --add-data "templates\hcnet_cloud_monthly_template.xlsx;templates" ^
   --name IssueReportGenerator ^
   scripts\hcnet_report_launcher.py
 

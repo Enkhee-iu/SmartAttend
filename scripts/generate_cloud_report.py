@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import re
 import shutil
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from openpyxl import load_workbook
+
+TEMPLATE_RELATIVE_PATH = Path("templates") / "hcnet_cloud_monthly_template.xlsx"
 
 
 SHEET_MAP = {
@@ -62,6 +65,11 @@ def infer_report_yyyymm(*paths: Path) -> str:
         if match:
             return match.group(1)
     raise ValueError("ファイル名からレポート年月(YYYYMM)を取得できません。")
+
+
+def resource_path(relative_path: Path) -> Path:
+    base_path = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+    return base_path / relative_path
 
 
 def infer_report_yyyymm_from_workbook(path: Path) -> str:
@@ -214,16 +222,28 @@ def populate_target_sheet(target_ws, source_ws, config: dict, data_yyyymm: str) 
         row[0].number_format = "yyyy-mm-dd hh:mm:ss"
 
 
-def generate_cloud_report(monthly_report_path: Path, graph_template_path: Path, output_path: Path | None = None) -> Path:
+def output_filename(report_yyyymm: str) -> str:
+    return f"HCNETプライベートクラウド月次報告_グラフ込み({report_yyyymm})原本_20260424.xlsx"
+
+
+def generate_cloud_report(
+    graph_template_path: Path,
+    output_path: Path | None = None,
+    template_path: Path | None = None,
+) -> Path:
     try:
-        report_yyyymm = infer_report_yyyymm(graph_template_path, monthly_report_path)
+        report_yyyymm = infer_report_yyyymm(graph_template_path)
     except ValueError:
-        report_yyyymm = infer_report_yyyymm_from_workbook(monthly_report_path)
+        report_yyyymm = infer_report_yyyymm_from_workbook(graph_template_path)
     data_yyyymm = previous_month_yyyymm(report_yyyymm)
     data_sheet_month = yyyymm_to_sheet_month(data_yyyymm)
 
-    output_path = output_path or monthly_report_path.with_name(f"{monthly_report_path.stem}_生成.xlsx")
-    shutil.copy2(monthly_report_path, output_path)
+    template_path = template_path or resource_path(TEMPLATE_RELATIVE_PATH)
+    if not template_path.exists():
+        raise FileNotFoundError(f"月次報告書テンプレートが見つかりません: {template_path}")
+
+    output_path = output_path or graph_template_path.with_name(output_filename(report_yyyymm))
+    shutil.copy2(template_path, output_path)
 
     target_wb = load_workbook(output_path)
     source_wb = load_workbook(graph_template_path, data_only=True)
@@ -249,14 +269,6 @@ def run_gui(parent=None) -> None:
     except Exception:
         return
 
-    monthly_report = filedialog.askopenfilename(
-        parent=parent,
-        title="月次報告書の原本 Excel を選択してください",
-        filetypes=(("Excel files", "*.xlsx"), ("All files", "*.*")),
-    )
-    if not monthly_report:
-        return
-
     graph_template = filedialog.askopenfilename(
         parent=parent,
         title="グラフひな形 Excel を選択してください",
@@ -266,7 +278,7 @@ def run_gui(parent=None) -> None:
         return
 
     try:
-        output_path = generate_cloud_report(Path(monthly_report), Path(graph_template))
+        output_path = generate_cloud_report(Path(graph_template))
     except Exception as exc:
         messagebox.showerror("HCNETクラウド月次報告書", f"作成に失敗しました。\n\n{exc}", parent=parent)
         return
