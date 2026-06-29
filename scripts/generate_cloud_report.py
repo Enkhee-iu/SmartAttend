@@ -275,6 +275,7 @@ def restore_query_table_metadata(template_path: Path, workbook_path: Path) -> No
             name
             for name in template_names
             if name.startswith("xl/queryTables/")
+            or (name.startswith("xl/tables/") and name.endswith(".xml"))
             or name.startswith("xl/tables/_rels/")
             or name == "xl/connections.xml"
         ]
@@ -292,6 +293,12 @@ def restore_query_table_metadata(template_path: Path, workbook_path: Path) -> No
                     content_root,
                     "/" + name,
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml",
+                )
+            elif name.startswith("xl/tables/") and name.endswith(".xml") and not name.endswith(".rels"):
+                add_content_type_override(
+                    content_root,
+                    "/" + name,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml",
                 )
 
         workbook_rels_root = ET.fromstring(generated_zip.read("xl/_rels/workbook.xml.rels"))
